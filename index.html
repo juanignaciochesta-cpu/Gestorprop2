@@ -348,7 +348,7 @@ const cfg = {
     if(user){
       currentUser = user;
       try {
-        const snap = await getDoc(doc(db,'usuarios',user.uid));
+        const snap = await getDoc(doc(db,'Users',user.uid));
         currentProfile = snap.exists() ? snap.data() : { uid:user.uid, email:user.email, nombre:user.email, rol:'propietario' };
         await loadAllData();
         document.getElementById('loadingScreen').style.display='none';
@@ -414,7 +414,7 @@ function isAdmin(){ return currentProfile?.rol === 'admin'; }
 
 async function loadAllData(){
   const loads = [
-    getDocs(collection(db,'usuarios')),
+    getDocs(collection(db,'Users')),
     getDocs(collection(db,'propiedades')),
     getDocs(collection(db,'contratos')),
     getDocs(collection(db,'pagos')),
@@ -534,7 +534,7 @@ window.guardarPropietario = async function(){
   if(!nombre||!email||!pass){ showToast('Completá todos los campos','error'); return; }
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db,'usuarios',cred.user.uid),{nombre,email,telefono:tel,rol:'propietario',activo:true,created_at:new Date().toISOString()});
+    await setDoc(doc(db,'Users',cred.user.uid),{nombre,email,telefono:tel,rol:'propietario',activo:true,created_at:new Date().toISOString()});
     // Volver a loguearse con el admin
     showToast('Propietario creado. Ya puede iniciar sesión.','success');
     closeModal('modalPropietario');
@@ -554,7 +554,7 @@ function renderPropietarios(){
 }
 window.togglePropietario = async function(id,activo){
   if(!confirm(`¿${activo?'Desactivar':'Activar'}?`)) return;
-  await updateDoc(doc(db,'usuarios',id),{activo:!activo});
+  await updateDoc(doc(db,'Users',id),{activo:!activo});
   await loadAllData(); renderPropietarios();
   showToast(`${activo?'Desactivado':'Activado'}`,'success');
 };
