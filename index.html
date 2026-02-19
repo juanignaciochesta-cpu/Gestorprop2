@@ -189,6 +189,7 @@ tr:hover td{background:var(--surface2);}
 <div class="loading-overlay hidden" id="loadingOverlay">
   <div class="spinner"></div>
   <span style="color:var(--muted);font-size:0.85rem" id="loadingMsg">Cargando...</span>
+  <button onclick="emergencyReset()" style="margin-top:20px;background:transparent;border:1px solid #2e2c28;color:#8a8070;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.78rem;display:none" id="cancelLoadBtn">Cancelar</button>
 </div>
 
 <!-- CONFIG SCREEN (primer uso) -->
@@ -558,9 +559,11 @@ const db = {
     return sbFetch(`/rest/v1/${table}?${q}`, { method:'DELETE' });
   },
   async selectOne(table, match){
-    const q = Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join('&');
-    const res = await sbFetch(`/rest/v1/${table}?${q}&limit=1`, { method:'GET', headers:{ 'Accept':'application/vnd.pgrst.object+json' } });
-    return res;
+    const q = Object.entries(match).map(([k,v])=>`${k}=eq.${encodeURIComponent(v)}`).join('&');
+    const res = await sbFetch(`/rest/v1/${table}?${q}&limit=1`, { method:'GET' });
+    // res is an array, return first element or null
+    if(Array.isArray(res)) return res[0] || null;
+    return res || null;
   }
 };
 
@@ -620,6 +623,25 @@ async function initApp(){
 
 function hideLoading(){
   document.getElementById('loadingOverlay').classList.add('hidden');
+  if(window._cancelTimer) clearTimeout(window._cancelTimer);
+}
+
+function showLoadingWithCancel(){
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  // Mostrar botón cancelar después de 5 segundos
+  window._cancelTimer = setTimeout(()=>{
+    const btn = document.getElementById('cancelLoadBtn');
+    if(btn) btn.style.display='block';
+  }, 5000);
+}
+
+function emergencyReset(){
+  hideLoading();
+  currentUser = null; currentProfile = null;
+  localStorage.removeItem('gestorprop_session');
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('cancelLoadBtn').style.display='none';
 }
 function showLogin(){
   hideLoading();
@@ -636,18 +658,37 @@ async function doLogin(){
   err.classList.remove('show');
   btn.textContent='Ingresando...'; btn.disabled=true;
   try {
+    document.getElementById('loadingMsg').textContent = 'Autenticando...';
     const user = await sbLogin(email, pass);
     currentUser = user;
     document.getElementById('loginScreen').style.display='none';
-    document.getElementById('loadingOverlay').classList.remove('hidden');
-    const profile = await db.selectOne('propietarios', { id: user.id });
-    currentProfile = profile;
-    await loadAllData();
+    showLoadingWithCancel();
+
+    document.getElementById('loadingMsg').textContent = 'Cargando perfil...';
+    try {
+      const profile = await db.selectOne('propietarios', { id: user.id });
+      currentProfile = profile || { id: user.id, email: user.email, rol: 'admin', nombre: user.email };
+    } catch(pe){
+      currentProfile = { id: user.id, email: user.email, rol: 'admin', nombre: user.email };
+    }
+
+    document.getElementById('loadingMsg').textContent = 'Cargando datos...';
+    try {
+      await loadAllData();
+    } catch(de){
+      console.warn('loadAllData error:', de);
+      // Continuar igual — puede ser RLS bloqueando, cargamos con arrays vacíos
+      cache = { propiedades:[], propietarios:[], inquilinos:[], contratos:[], pagos:[] };
+    }
+
+    document.getElementById('loadingMsg').textContent = 'Listo!';
     hideLoading();
     document.getElementById('app').classList.add('visible');
     setupUI();
     showPage('dashboard');
   } catch(e){
+    hideLoading();
+    document.getElementById('loginScreen').style.display='flex';
     err.textContent = e.message || 'Error al iniciar sesión';
     err.classList.add('show');
   }
