@@ -481,46 +481,58 @@ function saveConfig(){
   location.reload();
 }
 
-async function initApp(){
-  // Seguridad: si en 8 segundos no arrancó, mostrar error claro
-  const safetyTimer = setTimeout(()=>{
-    document.getElementById('loadingMsg').textContent = '⚠ Error de conexión. Revisá tu URL de Supabase.';
-  }, 8000);
+// Espera a que la librería de Supabase cargue (máx 6 segundos)
+function waitForSupabase(){
+  return new Promise((resolve)=>{
+    if(typeof window.supabase !== 'undefined'){ resolve(true); return; }
+    let tries = 0;
+    const interval = setInterval(()=>{
+      tries++;
+      if(typeof window.supabase !== 'undefined'){
+        clearInterval(interval);
+        resolve(true);
+      } else if(tries > 60){ // 6 segundos
+        clearInterval(interval);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
 
-  // Verificar que Supabase cargó desde el CDN
-  if(typeof window.supabase === 'undefined'){
-    clearTimeout(safetyTimer);
-    hideLoading();
-    document.getElementById('configScreen').style.display='flex';
-    showToast('No se pudo cargar la librería de conexión. Verificá tu internet.','error');
-    return;
-  }
+async function initApp(){
+  const loaded = await waitForSupabase();
 
   const cfg = getConfig();
 
-  // Sin config → mostrar pantalla de configuración
-  if(!cfg.url||!cfg.key){
-    clearTimeout(safetyTimer);
+  // Sin config → mostrar pantalla de configuración (sin importar si cargó Supabase)
+  if(!cfg.url || !cfg.key){
     hideLoading();
     document.getElementById('configScreen').style.display='flex';
     return;
   }
 
-  // Con config → conectar Supabase
+  // Si Supabase no cargó y hay config, mostrar error
+  if(!loaded){
+    hideLoading();
+    document.getElementById('configScreen').style.display='flex';
+    showToast('Error de red. Verificá tu conexión a internet.','error');
+    return;
+  }
+
+  // Conectar Supabase
   try {
     supabase = window.supabase.createClient(cfg.url, cfg.key);
   } catch(e) {
-    clearTimeout(safetyTimer);
     hideLoading();
+    localStorage.removeItem('gestorprop_cfg');
     document.getElementById('configScreen').style.display='flex';
-    showToast('Error al conectar con Supabase. Verificá las credenciales.','error');
+    showToast('Credenciales inválidas. Ingresalas de nuevo.','error');
     return;
   }
 
   // Verificar sesión activa
   try {
-    const { data, error } = await supabase.auth.getSession();
-    clearTimeout(safetyTimer);
+    const { data } = await supabase.auth.getSession();
     hideLoading();
     if(data?.session){
       await loadUserAndShow(data.session.user);
@@ -528,12 +540,11 @@ async function initApp(){
       showLogin();
     }
   } catch(e) {
-    clearTimeout(safetyTimer);
     hideLoading();
-    // Si falló por credenciales incorrectas → volver a config
     localStorage.removeItem('gestorprop_cfg');
     document.getElementById('configScreen').style.display='flex';
-    showToast('No se pudo conectar. Verificá la URL y la clave de Supabase.','error');
+    showToast('No se pudo conectar con Supabase. Verificá la URL y la clave.','error');
+    return;
   }
 
   // Escuchar cambios de auth
@@ -1269,9 +1280,9 @@ function filterTable(type,val){
 }
 
 // ═══════════════════════════════════════════
-// INIT
+// INIT — espera que todo esté listo
 // ═══════════════════════════════════════════
-initApp();
+window.addEventListener("load", initApp);
 </script>
 </body>
 </html>
