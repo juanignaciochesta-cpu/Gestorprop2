@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://identitytoolkit.googleapis.com; connect-src https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+<meta name="referrer" content="no-referrer">
 <title>GestorProp</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -322,6 +324,19 @@ window.saveConfig = function(){
 };
 
 // ═══════════════════════════════════════
+// SECURITY HELPERS
+// ═══════════════════════════════════════
+function esc(str){
+  if(!str && str !== 0) return '—';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
+}
+
+// ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
 let auth, db;
@@ -345,18 +360,23 @@ const cfg = {
   db   = getFirestore(app);
 
   onAuthStateChanged(auth, async (user) => {
+    // Siempre ocultar el panel hasta confirmar auth
+    document.getElementById('app').classList.remove('visible');
     if(user){
       currentUser = user;
       try {
         const snap = await getDoc(doc(db,'Users',user.uid));
         currentProfile = snap.exists() ? snap.data() : { uid:user.uid, email:user.email, nombre:user.email, rol:'propietario' };
+        // Solo mostrar la app DESPUÉS de confirmar identidad en Firebase
         await loadAllData();
         document.getElementById('loadingScreen').style.display='none';
+        document.getElementById('loginScreen').style.display='none';
         document.getElementById('app').classList.add('visible');
         setupUI();
         showPage('dashboard');
       } catch(e){
         console.error(e);
+        await signOut(auth); // forzar logout si falla la carga
         document.getElementById('loadingScreen').style.display='none';
         showLogin();
         showToast('Error al cargar datos: '+e.message,'error');
@@ -387,7 +407,7 @@ window.doLogin = async function(){
     await signInWithEmailAndPassword(auth, email, pass);
     // onAuthStateChanged se encarga del resto
   } catch(e){
-    const msgs = {'auth/invalid-credential':'Email o contraseña incorrectos.','auth/user-not-found':'No existe ese usuario.','auth/wrong-password':'Contraseña incorrecta.','auth/too-many-requests':'Demasiados intentos. Esperá unos minutos.'};
+    const msgs = {'auth/invalid-credential':'Email o contraseña incorrectos.','auth/user-not-found':'Email o contraseña incorrectos.','auth/wrong-password':'Email o contraseña incorrectos.','auth/too-many-requests':'Demasiados intentos. Esperá unos minutos.'};
     err.textContent = msgs[e.code] || e.message;
     err.classList.add('show');
     btn.textContent='Entrar'; btn.disabled=false;
@@ -488,6 +508,17 @@ function setupUI(){
 // ═══════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════
+// ── SESSION TIMEOUT (2 horas de inactividad) ──
+let _inactivityTimer;
+function resetInactivityTimer(){
+  clearTimeout(_inactivityTimer);
+  _inactivityTimer = setTimeout(async()=>{
+    await signOut(auth);
+    showToast('Sesión cerrada por inactividad','error');
+  }, 2 * 60 * 60 * 1000); // 2 horas
+}
+['click','keydown','mousemove','touchstart'].forEach(e=>document.addEventListener(e, resetInactivityTimer, {passive:true}));
+
 window.showPage = function(name, el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -532,21 +563,36 @@ window.guardarPropietario = async function(){
   const tel=document.getElementById('pp-tel').value.trim();
   const pass=document.getElementById('pp-pass').value;
   if(!nombre||!email||!pass){ showToast('Completá todos los campos','error'); return; }
+  if(pass.length < 8){ showToast('La contraseña debe tener al menos 8 caracteres','error'); return; }
+  if(!/[A-Z]/.test(pass)){ showToast('La contraseña debe tener al menos una mayúscula','error'); return; }
+  if(!/[0-9]/.test(pass)){ showToast('La contraseña debe tener al menos un número','error'); return; }
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db,'Users',cred.user.uid),{nombre,email,telefono:tel,rol:'propietario',activo:true,created_at:new Date().toISOString()});
-    // Volver a loguearse con el admin
+    // Usar REST API para crear usuario SIN cambiar la sesión del admin
+    const apiKey = cfg.apiKey;
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass, returnSecureToken: true })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error?.message || 'Error al crear usuario');
+    const uid = data.localId;
+    // Guardar perfil en Firestore (la sesión del admin no cambió)
+    await setDoc(doc(db,'Users',uid),{nombre,email,telefono:tel,rol:'propietario',activo:true,created_at:new Date().toISOString()});
     showToast('Propietario creado. Ya puede iniciar sesión.','success');
     closeModal('modalPropietario');
     await loadAllData(); renderPropietarios();
-  } catch(e){ showToast(e.message,'error'); }
+  } catch(e){ 
+    const msgs = {'EMAIL_EXISTS':'Ese email ya está registrado.','WEAK_PASSWORD : Password should be at least 6 characters':'La contraseña debe tener al menos 6 caracteres.'};
+    showToast(msgs[e.message] || e.message,'error'); 
+  }
 };
 
 function renderPropietarios(){
   const tbody=document.getElementById('tbody-propietarios');
   if(!cache.propietarios.length){ tbody.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><p>No hay propietarios</p></div></td></tr>`; return; }
   tbody.innerHTML=cache.propietarios.map(p=>`<tr>
-    <td><strong>${p.nombre||'—'}</strong></td><td>${p.email}</td><td>${p.telefono||'—'}</td>
+    <td><strong>${esc(p.nombre)}</strong></td><td>${esc(p.email)}</td><td>${esc(p.telefono)||'—'}</td>
     <td><span class="badge ${p.rol==='admin'?'badge-gold':'badge-blue'}">${p.rol==='admin'?'Admin':'Propietario'}</span></td>
     <td><span class="badge ${p.activo?'badge-green':'badge-gray'}">${p.activo?'Activo':'Inactivo'}</span></td>
     <td><button class="btn btn-${p.activo?'danger':'ghost'} btn-xs" onclick="togglePropietario('${p.id}',${p.activo})">${p.activo?'Desactivar':'Activar'}</button></td>
@@ -585,7 +631,7 @@ function renderPropiedades(filter=''){
   tbody.innerHTML=rows.map(p=>{
     const owner=getPropietario(p.propietario_id);
     const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editPropiedad('${p.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPropiedad('${p.id}')">✕</button>`:'';
-    return `<tr><td><strong>${p.direccion}</strong>${p.piso?`<br><small style="color:var(--muted)">${p.piso}</small>`:''}</td>${isAdmin()?`<td>${owner?.nombre||'—'}</td>`:''}<td>${p.tipo||'—'}</td><td>${p.m2?p.m2+' m²':'—'}</td><td><span class="badge ${eb[p.estado]||'badge-gray'}">${p.estado}</span></td><td>${fmtMoney(p.valor,p.moneda)}</td><td><div class="actions">${acts}</div></td></tr>`;
+    return `<tr><td><strong>${esc(p.direccion)}</strong>${p.piso?`<br><small style="color:var(--muted)">${esc(p.piso)}</small>`:''}</td>${isAdmin()?`<td>${esc(owner?.nombre)||'—'}</td>`:''}<td>${esc(p.tipo)||'—'}</td><td>${p.m2?p.m2+' m²':'—'}</td><td><span class="badge ${eb[p.estado]||'badge-gray'}">${esc(p.estado)}</span></td><td>${fmtMoney(p.valor,p.moneda)}</td><td><div class="actions">${acts}</div></td></tr>`;
   }).join('');
 }
 window.editPropiedad = function(id){ const p=getProp(id); if(!p) return; editMode={type:'propiedades',id}; openModalPropiedad(); setTimeout(()=>{ document.getElementById('p-dir').value=p.direccion||''; document.getElementById('p-prop').value=p.propietario_id||''; document.getElementById('p-tipo').value=p.tipo||''; document.getElementById('p-est').value=p.estado||''; document.getElementById('p-m2').value=p.m2||''; document.getElementById('p-amb').value=p.ambientes||''; document.getElementById('p-piso').value=p.piso||''; document.getElementById('p-val').value=p.valor||''; document.getElementById('p-mon').value=p.moneda||'ARS'; document.getElementById('p-notas').value=p.notas||''; document.getElementById('titlePropiedad').textContent='Editar Propiedad'; },50); };
@@ -607,7 +653,7 @@ function renderInquilinos(filter=''){
   const tbody=document.getElementById('tbody-inquilinos');
   let rows=cache.inquilinos; if(filter) rows=rows.filter(i=>(i.nombre||'').toLowerCase().includes(filter)||(i.dni||'').includes(filter));
   if(!rows.length){ tbody.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><p>No hay inquilinos</p></div></td></tr>`; return; }
-  tbody.innerHTML=rows.map(i=>`<tr><td><strong>${i.nombre}</strong></td><td>${i.dni||'—'}</td><td>${i.telefono||'—'}</td><td>${i.email||'—'}</td><td>${i.garantia_tipo?`<span class="badge badge-blue">${i.garantia_tipo}</span>`:'—'}</td><td><div class="actions"><button class="btn btn-ghost btn-xs" onclick="editInquilino('${i.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delInquilino('${i.id}')">✕</button></div></td></tr>`).join('');
+  tbody.innerHTML=rows.map(i=>`<tr><td><strong>${esc(i.nombre)}</strong></td><td>${esc(i.dni)||'—'}</td><td>${esc(i.telefono)||'—'}</td><td>${esc(i.email)||'—'}</td><td>${i.garantia_tipo?`<span class="badge badge-blue">${esc(i.garantia_tipo)}</span>`:'—'}</td><td><div class="actions"><button class="btn btn-ghost btn-xs" onclick="editInquilino('${i.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delInquilino('${i.id}')">✕</button></div></td></tr>`).join('');
 }
 window.editInquilino = function(id){ const i=getInq(id); if(!i) return; editMode={type:'inquilinos',id}; document.getElementById('i-nom').value=i.nombre||''; document.getElementById('i-dni').value=i.dni||''; document.getElementById('i-tel').value=i.telefono||''; document.getElementById('i-email').value=i.email||''; document.getElementById('i-dom').value=i.domicilio||''; document.getElementById('i-gtipo').value=i.garantia_tipo||''; document.getElementById('i-gdat').value=i.garantia_datos||''; document.getElementById('i-notas').value=i.notas||''; document.getElementById('titleInquilino').textContent='Editar Inquilino'; openModal('modalInquilino'); };
 window.delInquilino = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'inquilinos',id)); await loadAllData(); renderInquilinos(); showToast('Eliminado'); };
@@ -616,8 +662,8 @@ window.delInquilino = async function(id){ if(!confirm('¿Eliminar?')) return; aw
 // CONTRATOS
 // ═══════════════════════════════════════
 window.openContratoModal = function(){
-  document.getElementById('c-prop').innerHTML='<option value="">Seleccionar...</option>'+cache.propiedades.map(p=>`<option value="${p.id}">${p.direccion}</option>`).join('');
-  document.getElementById('c-inq').innerHTML='<option value="">Seleccionar...</option>'+cache.inquilinos.map(i=>`<option value="${i.id}">${i.nombre}</option>`).join('');
+  document.getElementById('c-prop').innerHTML='<option value="">Seleccionar...</option>'+cache.propiedades.map(p=>`<option value="${p.id}">${esc(p.direccion)}</option>`).join('');
+  document.getElementById('c-inq').innerHTML='<option value="">Seleccionar...</option>'+cache.inquilinos.map(i=>`<option value="${i.id}">${esc(i.nombre)}</option>`).join('');
   openModal('modalContrato');
 };
 window.guardarContrato = async function(){
@@ -635,7 +681,7 @@ function renderContratos(filter=''){
   let rows=cache.contratos; if(filter) rows=rows.filter(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
   if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">📄</div><p>No hay contratos</p></div></td></tr>`; return; }
   const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
-  tbody.innerHTML=rows.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const e=contratoEst(c); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editContrato('${c.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delContrato('${c.id}')">✕</button>`:''; return `<tr><td>${p?.direccion||'—'}</td><td>${i?.nombre||'—'}</td><td>${fmtDate(c.fecha_inicio)}</td><td>${fmtDate(c.fecha_vencimiento)}</td><td><strong>${fmtMoney(c.monto,c.moneda)}</strong></td><td style="font-size:.76rem">${fl[c.actualizacion_meses]||c.actualizacion_meses+'m'} / ${c.indice}</td><td><span class="badge ${e.cls}">${e.l}</span></td><td><div class="actions"><a href="${arquilerLink(c)}" target="_blank" class="arquiler-btn">🔗</a>${acts}</div></td></tr>`; }).join('');
+  tbody.innerHTML=rows.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const e=contratoEst(c); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editContrato('${c.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delContrato('${c.id}')">✕</button>`:''; return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${fmtDate(c.fecha_inicio)}</td><td>${fmtDate(c.fecha_vencimiento)}</td><td><strong>${fmtMoney(c.monto,c.moneda)}</strong></td><td style="font-size:.76rem">${fl[c.actualizacion_meses]||c.actualizacion_meses+'m'} / ${esc(c.indice)}</td><td><span class="badge ${e.cls}">${e.l}</span></td><td><div class="actions"><a href="${arquilerLink(c)}" target="_blank" class="arquiler-btn">🔗</a>${acts}</div></td></tr>`; }).join('');
 }
 window.editContrato = function(id){ const c=getCont(id); if(!c) return; editMode={type:'contratos',id}; openContratoModal(); setTimeout(()=>{ document.getElementById('c-prop').value=c.propiedad_id||''; document.getElementById('c-inq').value=c.inquilino_id||''; document.getElementById('c-ini').value=c.fecha_inicio||''; document.getElementById('c-ven').value=c.fecha_vencimiento||''; document.getElementById('c-monto').value=c.monto||''; document.getElementById('c-mon').value=c.moneda||'ARS'; document.getElementById('c-ind').value=c.indice||'IPC'; document.getElementById('c-frec').value=c.actualizacion_meses||3; document.getElementById('c-dia').value=c.dia_pago||''; document.getElementById('c-grac').value=c.dias_gracia||5; document.getElementById('c-dep').value=c.deposito||''; document.getElementById('c-exp').value=c.expediente||''; document.getElementById('c-notas').value=c.notas||''; document.getElementById('titleContrato').textContent='Editar Contrato'; },50); };
 window.delContrato = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'contratos',id)); await loadAllData(); renderContratos(); showToast('Eliminado'); };
@@ -643,8 +689,20 @@ window.delContrato = async function(id){ if(!confirm('¿Eliminar?')) return; awa
 // ═══════════════════════════════════════
 // PAGOS
 // ═══════════════════════════════════════
-window.openModalPago = function(contratoId){
-  document.getElementById('pg-cont').innerHTML='<option value="">Seleccionar...</option>'+cache.contratos.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); return `<option value="${c.id}">${p?.direccion||'?'} — ${i?.nombre||'?'}</option>`; }).join('');
+window.openModalPago = async function(contratoId){
+  // Recargar contratos frescos antes de abrir el modal
+  if(cache.contratos.length === 0){
+    try {
+      const snap = await getDocs(collection(db,'contratos'));
+      cache.contratos = snap.docs.map(d=>({id:d.id,...d.data()}));
+    } catch(e){}
+  }
+  const opts = cache.contratos.map(c=>{
+    const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id);
+    const label = (p?.direccion||'Sin dirección') + (i?' — '+i.nombre:'');
+    return `<option value="${c.id}">${label}</option>`;
+  }).join('');
+  document.getElementById('pg-cont').innerHTML='<option value="">Seleccionar contrato...</option>'+opts;
   const hoy=new Date(); document.getElementById('pg-fecha').value=hoy.toISOString().split('T')[0]; document.getElementById('pg-per').value=hoy.toISOString().slice(0,7);
   if(contratoId){ document.getElementById('pg-cont').value=contratoId; autoFillPago(); }
   openModal('modalPago');
@@ -664,7 +722,7 @@ function renderPagos(filter=''){
   let rows=cache.pagos; if(filter) rows=rows.filter(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
   if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💳</div><p>No hay pagos</p></div></td></tr>`; return; }
   const eb={Cobrado:'badge-green',Pendiente:'badge-yellow',Atrasado:'badge-red'};
-  tbody.innerHTML=rows.map(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; const per=pg.periodo?pg.periodo.split('-').reverse().join('/'):'—'; const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editPago('${pg.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPago('${pg.id}')">✕</button>`:''; return `<tr><td>${p?.direccion||'—'}</td><td>${i?.nombre||'—'}</td><td>${per}</td><td><strong>${fmtMoney(pg.monto,pg.moneda)}</strong></td><td>${fmtDate(pg.fecha_pago)}</td><td>${pg.metodo||'—'}</td><td><span class="badge ${eb[pg.estado]||'badge-gray'}">${pg.estado}</span></td><td><div class="actions">${acts}</div></td></tr>`; }).join('');
+  tbody.innerHTML=rows.map(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; const per=pg.periodo?pg.periodo.split('-').reverse().join('/'):'—'; const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editPago('${pg.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPago('${pg.id}')">✕</button>`:''; return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${per}</td><td><strong>${fmtMoney(pg.monto,pg.moneda)}</strong></td><td>${fmtDate(pg.fecha_pago)}</td><td>${esc(pg.metodo)||'—'}</td><td><span class="badge ${eb[pg.estado]||'badge-gray'}">${esc(pg.estado)}</span></td><td><div class="actions">${acts}</div></td></tr>`; }).join('');
 }
 window.editPago = function(id){ const pg=cache.pagos.find(x=>x.id===id); if(!pg) return; editMode={type:'pagos',id}; openModalPago(pg.contrato_id); setTimeout(()=>{ document.getElementById('pg-cont').value=pg.contrato_id||''; document.getElementById('pg-per').value=pg.periodo||''; document.getElementById('pg-fecha').value=pg.fecha_pago||''; document.getElementById('pg-monto').value=pg.monto||''; document.getElementById('pg-mon').value=pg.moneda||'ARS'; document.getElementById('pg-met').value=pg.metodo||''; document.getElementById('pg-est').value=pg.estado||'Cobrado'; document.getElementById('pg-notas').value=pg.notas||''; document.getElementById('titlePago').textContent='Editar Pago'; },50); };
 window.delPago = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'pagos',id)); await loadAllData(); renderPagos(); showToast('Eliminado'); };
@@ -725,10 +783,10 @@ function renderDashboard(){
       <div class="card"><h3>🏠 Propiedades</h3><div id="d-props"></div></div>
       <div class="card"><h3>📋 Contratos por vencer</h3><div id="d-vencs"></div></div>
     </div>`;
-  const du=document.getElementById('d-urg'); if(!urgentes.length) du.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><p>Sin urgencias</p></div>`; else du.innerHTML=urgentes.slice(0,4).map(a=>`<div class="alert-item"><div class="alert-dot" style="background:var(--danger)"></div><div class="alert-body"><div class="alert-title">${a.p?.direccion||'—'}</div><div class="alert-sub">${a.i?.nombre||''} · ${a.tipo.replace(/-/g,' ')}</div></div></div>`).join('');
-  const dp=document.getElementById('d-pag'); if(!pags.length) dp.innerHTML=`<div class="empty"><div class="empty-icon">—</div><p>Sin pagos</p></div>`; else dp.innerHTML=pags.slice(0,5).map(pg=>{ const c=getCont(pg.contrato_id); const i=c?getInq(c.inquilino_id):null; const col=pg.estado==='Cobrado'?'var(--success)':pg.estado==='Atrasado'?'var(--danger)':'var(--warning)'; return `<div class="alert-item"><div class="alert-dot" style="background:${col}"></div><div class="alert-body"><div class="alert-title">${i?.nombre||'—'} — ${fmtMoney(pg.monto,pg.moneda)}</div><div class="alert-sub">${fmtDate(pg.fecha_pago)} · <span style="color:${col}">${pg.estado}</span></div></div></div>`; }).join('');
-  const dpr=document.getElementById('d-props'); if(!props.length) dpr.innerHTML=`<div class="empty"><div class="empty-icon">🏠</div><p>Sin propiedades</p></div>`; else dpr.innerHTML=props.slice(0,5).map(p=>{ const eb={Disponible:'badge-green',Alquilado:'badge-blue','En reparación':'badge-yellow'}; return `<div class="alert-item"><div class="alert-dot" style="background:var(--accent)"></div><div class="alert-body"><div class="alert-title">${p.direccion}</div><div class="alert-sub"><span class="badge ${eb[p.estado]||'badge-gray'}" style="font-size:.65rem">${p.estado}</span> ${p.tipo?'· '+p.tipo:''}</div></div></div>`; }).join('');
-  const dv=document.getElementById('d-vencs'); const pv=conts.filter(c=>c.fecha_vencimiento&&diasHasta(c.fecha_vencimiento)>=0&&diasHasta(c.fecha_vencimiento)<=90).sort((a,b)=>diasHasta(a.fecha_vencimiento)-diasHasta(b.fecha_vencimiento)); if(!pv.length) dv.innerHTML=`<div class="empty"><div class="empty-icon">✓</div><p>Sin vencimientos próximos</p></div>`; else dv.innerHTML=pv.slice(0,5).map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const d=diasHasta(c.fecha_vencimiento); const col=d<=30?'var(--danger)':'var(--warning)'; return `<div class="alert-item"><div class="alert-dot" style="background:${col}"></div><div class="alert-body"><div class="alert-title">${p?.direccion||'—'}</div><div class="alert-sub">${i?.nombre||''} · <strong style="color:${col}">${d} días</strong></div></div></div>`; }).join('');
+  const du=document.getElementById('d-urg'); if(!urgentes.length) du.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><p>Sin urgencias</p></div>`; else du.innerHTML=urgentes.slice(0,4).map(a=>`<div class="alert-item"><div class="alert-dot" style="background:var(--danger)"></div><div class="alert-body"><div class="alert-title">${esc(a.p?.direccion)||'—'}</div><div class="alert-sub">${esc(a.i?.nombre)||''} · ${a.tipo.replace(/-/g,' ')}</div></div></div>`).join('');
+  const dp=document.getElementById('d-pag'); if(!pags.length) dp.innerHTML=`<div class="empty"><div class="empty-icon">—</div><p>Sin pagos</p></div>`; else dp.innerHTML=pags.slice(0,5).map(pg=>{ const c=getCont(pg.contrato_id); const i=c?getInq(c.inquilino_id):null; const col=pg.estado==='Cobrado'?'var(--success)':pg.estado==='Atrasado'?'var(--danger)':'var(--warning)'; return `<div class="alert-item"><div class="alert-dot" style="background:${col}"></div><div class="alert-body"><div class="alert-title">${esc(i?.nombre)||'—'} — ${fmtMoney(pg.monto,pg.moneda)}</div><div class="alert-sub">${fmtDate(pg.fecha_pago)} · <span style="color:${col}">${esc(pg.estado)}</span></div></div></div>`; }).join('');
+  const dpr=document.getElementById('d-props'); if(!props.length) dpr.innerHTML=`<div class="empty"><div class="empty-icon">🏠</div><p>Sin propiedades</p></div>`; else dpr.innerHTML=props.slice(0,5).map(p=>{ const eb={Disponible:'badge-green',Alquilado:'badge-blue','En reparación':'badge-yellow'}; return `<div class="alert-item"><div class="alert-dot" style="background:var(--accent)"></div><div class="alert-body"><div class="alert-title">${esc(p.direccion)}</div><div class="alert-sub"><span class="badge ${eb[p.estado]||'badge-gray'}" style="font-size:.65rem">${esc(p.estado)}</span> ${p.tipo?'· '+esc(p.tipo):''}</div></div></div>`; }).join('');
+  const dv=document.getElementById('d-vencs'); const pv=conts.filter(c=>c.fecha_vencimiento&&diasHasta(c.fecha_vencimiento)>=0&&diasHasta(c.fecha_vencimiento)<=90).sort((a,b)=>diasHasta(a.fecha_vencimiento)-diasHasta(b.fecha_vencimiento)); if(!pv.length) dv.innerHTML=`<div class="empty"><div class="empty-icon">✓</div><p>Sin vencimientos próximos</p></div>`; else dv.innerHTML=pv.slice(0,5).map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const d=diasHasta(c.fecha_vencimiento); const col=d<=30?'var(--danger)':'var(--warning)'; return `<div class="alert-item"><div class="alert-dot" style="background:${col}"></div><div class="alert-body"><div class="alert-title">${esc(p?.direccion)||'—'}</div><div class="alert-sub">${i?.nombre||''} · <strong style="color:${col}">${d} días</strong></div></div></div>`; }).join('');
 }
 
 window.filterTable = function(type,val){ const f=val.toLowerCase().trim(); ({propiedades:renderPropiedades,inquilinos:renderInquilinos,contratos:renderContratos,pagos:renderPagos})[type]?.(f); };
