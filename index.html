@@ -132,6 +132,20 @@ tr:hover td{background:var(--surface2);}
 .owner-header h2{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--accent);margin-bottom:4px;}
 .owner-header p{color:var(--muted);font-size:0.85rem;}
 .cfg-box{background:rgba(110,160,201,0.08);border:1px solid rgba(110,160,201,0.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:0.85rem;color:var(--info);}
+
+/* RECIBO */
+.recibo-modal .modal{width:700px;}
+.recibo-concepto{display:grid;grid-template-columns:1fr 160px 36px;gap:8px;align-items:center;margin-bottom:8px;}
+.recibo-concepto input{margin:0;}
+.recibo-total{background:rgba(201,169,110,0.08);border:1px solid rgba(201,169,110,0.25);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;}
+.recibo-total-label{font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);}
+.recibo-total-val{font-size:1.4rem;font-weight:700;color:var(--accent);}
+@media print{
+  body > *:not(#printArea){display:none!important;}
+  #printArea{display:block!important;position:fixed;inset:0;background:white;padding:40px;z-index:99999;}
+  #printArea *{color:#000!important;border-color:#ccc!important;}
+}
+#printArea{display:none;}
 </style>
 </head>
 <body>
@@ -203,10 +217,38 @@ tr:hover td{background:var(--surface2);}
       <div class="table-wrap"><div class="table-toolbar"><input class="search-input" placeholder="Buscar..." oninput="filterTable('contratos',this.value)"></div>
       <table><thead><tr><th>Propiedad</th><th>Inquilino</th><th>Inicio</th><th>Vencimiento</th><th>Alquiler</th><th>Actualización</th><th>Estado</th><th></th></tr></thead><tbody id="tbody-contratos"></tbody></table></div>
     </div>
+    <div class="page" id="page-config">
+      <div class="page-header"><div><div class="page-title">Configuración</div><div class="page-sub">Datos de la empresa que aparecen en los cupones</div></div><button class="btn btn-primary btn-sm" onclick="guardarConfig()">Guardar cambios</button></div>
+      <div style="max-width:640px;">
+        <div class="card" style="margin-bottom:16px;">
+          <h3>🏢 Datos de la empresa</h3>
+          <div class="form-grid">
+            <div class="form-group form-full"><label>Razón Social</label><input id="cfg-razon" placeholder="Ej: Terralex Servicios Jurídicos Inmobiliarios"></div>
+            <div class="form-group form-full"><label>Domicilio Comercial</label><input id="cfg-domicilio" placeholder="Ej: Tucumán 335 - PA"></div>
+            <div class="form-group"><label>CUIT</label><input id="cfg-cuit" placeholder="Ej: 20-12345678-9"></div>
+            <div class="form-group"><label>Condición frente al IVA</label><select id="cfg-iva"><option>Resp. Monotributista</option><option>Responsable Inscripto</option><option>Exento</option><option>Consumidor Final</option></select></div>
+            <div class="form-group"><label>Ingresos Brutos</label><input id="cfg-iibb" placeholder="Ej: Exenta o N° 123456"></div>
+            <div class="form-group"><label>Inicio de Actividades</label><input type="date" id="cfg-inicio"></div>
+            <div class="form-group"><label>Teléfono</label><input id="cfg-tel" placeholder="Ej: (0351) 123-4567"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="cfg-email" placeholder="contacto@empresa.com"></div>
+            <div class="form-group form-full"><label>Nota al pie del cupón</label><input id="cfg-nota" placeholder="Ej: Documento no válido como factura"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>🔢 Numeración de cupones</h3>
+          <div class="form-grid">
+            <div class="form-group"><label>Número de contrato base</label><input type="number" id="cfg-contrato-base" placeholder="19"></div>
+            <div class="form-group"><label>Próximo número de cuota</label><input type="number" id="cfg-cuota-next" placeholder="13"></div>
+          </div>
+          <p class="form-hint" style="margin-top:8px;">Los cupones se numerarán como: <strong>NNNN-NNNNNNNNNNNN</strong> (ej: 0019-00000013)</p>
+        </div>
+      </div>
+    </div>
+
     <div class="page" id="page-pagos">
       <div class="page-header"><div><div class="page-title">Pagos</div></div><div id="pagoActions"></div></div>
       <div class="table-wrap"><div class="table-toolbar"><input class="search-input" placeholder="Buscar..." oninput="filterTable('pagos',this.value)"></div>
-      <table><thead><tr><th>Propiedad</th><th>Inquilino</th><th>Período</th><th>Monto</th><th>Fecha</th><th>Método</th><th>Estado</th><th></th></tr></thead><tbody id="tbody-pagos"></tbody></table></div>
+      <table><thead><tr><th>Propiedad</th><th>Inquilino</th><th>Período</th><th>Alquiler</th><th>Servicios</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody id="tbody-pagos"></tbody></table></div>
     </div>
   </main>
 </div>
@@ -295,10 +337,53 @@ tr:hover td{background:var(--surface2);}
       <div class="form-group"><label>Método</label><select id="pg-met"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Depósito</option></select></div>
       <div class="form-group"><label>Estado</label><select id="pg-est"><option value="Cobrado">Cobrado</option><option value="Pendiente">Pendiente</option><option value="Atrasado">Atrasado</option></select></div>
       <div class="form-group form-full"><label>Notas</label><textarea id="pg-notas"></textarea></div>
+      <div class="form-full" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">💧 Servicios del mes (opcional)</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Agua</label><input type="number" id="pg-agua" placeholder="0"></div>
+          <div class="form-group"><label>Luz</label><input type="number" id="pg-luz" placeholder="0"></div>
+          <div class="form-group"><label>Gas</label><input type="number" id="pg-gas" placeholder="0"></div>
+          <div class="form-group"><label>Contribución municipal</label><input type="number" id="pg-municipal" placeholder="0"></div>
+          <div class="form-group"><label>Rentas provincial</label><input type="number" id="pg-rentas" placeholder="0"></div>
+          <div class="form-group"><label>Otros</label><input type="number" id="pg-otros" placeholder="0"><span class="form-hint"><input type="text" id="pg-otros-label" placeholder="Descripción (ej: ABSA)" style="margin-top:4px;font-size:0.78rem;padding:6px 10px;"></span></div>
+        </div>
+      </div>
     </div></div>
     <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modalPago')">Cancelar</button><button class="btn btn-primary" style="width:auto" onclick="guardarPago()">Registrar</button></div>
   </div>
 </div>
+
+<!-- MODAL RECIBO -->
+<div class="modal-overlay recibo-modal" id="modalRecibo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📄 Generar Recibo</div>
+      <button class="modal-close" onclick="closeModal('modalRecibo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="recibo-info" style="background:var(--surface2);border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:0.85rem;line-height:1.8;"></div>
+      <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Conceptos del recibo</div>
+      <div style="display:grid;grid-template-columns:1fr 160px 36px;gap:8px;margin-bottom:6px;">
+        <span style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Descripción</span>
+        <span style="font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;">Monto (ARS)</span>
+        <span></span>
+      </div>
+      <div id="recibo-conceptos"></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="agregarConcepto()">+ Agregar concepto</button>
+      <div class="recibo-total">
+        <span class="recibo-total-label">Total a pagar</span>
+        <span class="recibo-total-val" id="recibo-total-val">$ 0</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalRecibo')">Cancelar</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="imprimirRecibo()">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ÁREA DE IMPRESIÓN -->
+<div id="printArea"></div>
 
 <script type="module">
 // ═══════════════════════════════════════
@@ -494,7 +579,11 @@ function setupUI(){
     </div>
     <div class="nav-item" data-page="pagos" onclick="showPage('pagos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Pagos
-    </div>`;
+    </div>
+    ${isAdmin()?`<div class="nav-label">Sistema</div>
+    <div class="nav-item" data-page="config" onclick="showPage('config',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Configuración
+    </div>`:''}`;
 
   document.getElementById('propActions').innerHTML    = isAdmin() ? `<button class="btn btn-primary btn-sm" onclick="openModalPropiedad()">+ Nueva propiedad</button>` : '';
   document.getElementById('contratoActions').innerHTML = isAdmin() ? `<button class="btn btn-primary btn-sm" onclick="openContratoModal()">+ Nuevo contrato</button>` : '';
@@ -524,7 +613,7 @@ window.showPage = function(name, el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   (el || document.querySelector(`[data-page="${name}"]`))?.classList.add('active');
-  ({dashboard:renderDashboard,alertas:renderAlertas,propiedades:renderPropiedades,propietarios:renderPropietarios,inquilinos:renderInquilinos,contratos:renderContratos,pagos:renderPagos})[name]?.();
+  ({dashboard:renderDashboard,alertas:renderAlertas,propiedades:renderPropiedades,propietarios:renderPropietarios,inquilinos:renderInquilinos,contratos:renderContratos,pagos:renderPagos,config:renderConfigPage})[name]?.();
 };
 
 // ═══════════════════════════════════════
@@ -709,7 +798,25 @@ window.openModalPago = async function(contratoId){
 };
 window.autoFillPago = function(){ const c=getCont(document.getElementById('pg-cont').value); if(c){ document.getElementById('pg-monto').value=c.monto||''; document.getElementById('pg-mon').value=c.moneda||'ARS'; } };
 window.guardarPago = async function(){
-  const o={contrato_id:document.getElementById('pg-cont').value,periodo:document.getElementById('pg-per').value,fecha_pago:document.getElementById('pg-fecha').value||null,monto:document.getElementById('pg-monto').value||null,moneda:document.getElementById('pg-mon').value,metodo:document.getElementById('pg-met').value,estado:document.getElementById('pg-est').value,notas:document.getElementById('pg-notas').value};
+  const o={
+    contrato_id:document.getElementById('pg-cont').value,
+    periodo:document.getElementById('pg-per').value,
+    fecha_pago:document.getElementById('pg-fecha').value||null,
+    monto:document.getElementById('pg-monto').value||null,
+    moneda:document.getElementById('pg-mon').value,
+    metodo:document.getElementById('pg-met').value,
+    estado:document.getElementById('pg-est').value,
+    notas:document.getElementById('pg-notas').value,
+    servicios:{
+      agua:   parseFloat(document.getElementById('pg-agua').value)||0,
+      luz:    parseFloat(document.getElementById('pg-luz').value)||0,
+      gas:    parseFloat(document.getElementById('pg-gas').value)||0,
+      municipal: parseFloat(document.getElementById('pg-municipal').value)||0,
+      rentas: parseFloat(document.getElementById('pg-rentas').value)||0,
+      otros:  parseFloat(document.getElementById('pg-otros').value)||0,
+      otros_label: document.getElementById('pg-otros-label').value||''
+    }
+  };
   if(!o.contrato_id){ showToast('Seleccioná un contrato','error'); return; }
   try {
     if(editMode.id) await updateDoc(doc(db,'pagos',editMode.id),o);
@@ -717,14 +824,15 @@ window.guardarPago = async function(){
     showToast('Pago registrado','success'); closeModal('modalPago'); await loadAllData(); renderPagos(); updateAlertBadge();
   } catch(e){ showToast(e.message,'error'); }
 };
+function totalServicios(sv){ if(!sv) return 0; return (sv.agua||0)+(sv.luz||0)+(sv.gas||0)+(sv.municipal||0)+(sv.rentas||0)+(sv.otros||0); }
 function renderPagos(filter=''){
   const tbody=document.getElementById('tbody-pagos');
   let rows=cache.pagos; if(filter) rows=rows.filter(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
   if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💳</div><p>No hay pagos</p></div></td></tr>`; return; }
   const eb={Cobrado:'badge-green',Pendiente:'badge-yellow',Atrasado:'badge-red'};
-  tbody.innerHTML=rows.map(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; const per=pg.periodo?pg.periodo.split('-').reverse().join('/'):'—'; const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editPago('${pg.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPago('${pg.id}')">✕</button>`:''; return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${per}</td><td><strong>${fmtMoney(pg.monto,pg.moneda)}</strong></td><td>${fmtDate(pg.fecha_pago)}</td><td>${esc(pg.metodo)||'—'}</td><td><span class="badge ${eb[pg.estado]||'badge-gray'}">${esc(pg.estado)}</span></td><td><div class="actions">${acts}</div></td></tr>`; }).join('');
+  tbody.innerHTML=rows.map(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; const per=pg.periodo?pg.periodo.split('-').reverse().join('/'):'—'; const ts=totalServicios(pg.servicios); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="generarRecibo('${pg.id}')">🧾 Recibo</button><button class="btn btn-ghost btn-xs" onclick="editPago('${pg.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPago('${pg.id}')">✕</button>`:`<button class="btn btn-ghost btn-xs" onclick="generarRecibo('${pg.id}')">🧾 Recibo</button>`; return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${per}</td><td><strong>${fmtMoney(pg.monto,pg.moneda)}</strong></td><td>${ts>0?fmtMoney(ts,pg.moneda):'—'}</td><td>${fmtDate(pg.fecha_pago)}</td><td><span class="badge ${eb[pg.estado]||'badge-gray'}">${esc(pg.estado)}</span></td><td><div class="actions">${acts}</div></td></tr>`; }).join('');
 }
-window.editPago = function(id){ const pg=cache.pagos.find(x=>x.id===id); if(!pg) return; editMode={type:'pagos',id}; openModalPago(pg.contrato_id); setTimeout(()=>{ document.getElementById('pg-cont').value=pg.contrato_id||''; document.getElementById('pg-per').value=pg.periodo||''; document.getElementById('pg-fecha').value=pg.fecha_pago||''; document.getElementById('pg-monto').value=pg.monto||''; document.getElementById('pg-mon').value=pg.moneda||'ARS'; document.getElementById('pg-met').value=pg.metodo||''; document.getElementById('pg-est').value=pg.estado||'Cobrado'; document.getElementById('pg-notas').value=pg.notas||''; document.getElementById('titlePago').textContent='Editar Pago'; },50); };
+window.editPago = function(id){ const pg=cache.pagos.find(x=>x.id===id); if(!pg) return; editMode={type:'pagos',id}; openModalPago(pg.contrato_id); setTimeout(()=>{ document.getElementById('pg-cont').value=pg.contrato_id||''; document.getElementById('pg-per').value=pg.periodo||''; document.getElementById('pg-fecha').value=pg.fecha_pago||''; document.getElementById('pg-monto').value=pg.monto||''; document.getElementById('pg-mon').value=pg.moneda||'ARS'; document.getElementById('pg-met').value=pg.metodo||''; document.getElementById('pg-est').value=pg.estado||'Cobrado'; document.getElementById('pg-notas').value=pg.notas||''; const sv=pg.servicios||{}; document.getElementById('pg-agua').value=sv.agua||''; document.getElementById('pg-luz').value=sv.luz||''; document.getElementById('pg-gas').value=sv.gas||''; document.getElementById('pg-municipal').value=sv.municipal||''; document.getElementById('pg-rentas').value=sv.rentas||''; document.getElementById('pg-otros').value=sv.otros||''; document.getElementById('pg-otros-label').value=sv.otros_label||''; document.getElementById('titlePago').textContent='Editar Pago'; },50); };
 window.delPago = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'pagos',id)); await loadAllData(); renderPagos(); showToast('Eliminado'); };
 
 // ═══════════════════════════════════════
@@ -790,6 +898,221 @@ function renderDashboard(){
 }
 
 window.filterTable = function(type,val){ const f=val.toLowerCase().trim(); ({propiedades:renderPropiedades,inquilinos:renderInquilinos,contratos:renderContratos,pagos:renderPagos})[type]?.(f); };
+
+// ═══════════════════════════════════════
+// RECIBO
+// ═══════════════════════════════════════
+// ═══════════════════════════════════════
+// RECIBO Y CONFIGURACIÓN
+// ═══════════════════════════════════════
+// ── CONFIG PAGE ──
+let _empresaConfig = null;
+
+async function loadEmpresaConfig(){
+  try {
+    const snap = await getDoc(doc(db,'config','empresa'));
+    _empresaConfig = snap.exists() ? snap.data() : {};
+  } catch(e){ _empresaConfig = {}; }
+}
+
+window.renderConfigPage = async function(){
+  await loadEmpresaConfig();
+  const c = _empresaConfig || {};
+  const setValue = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+  setValue('cfg-razon', c.razon);
+  setValue('cfg-domicilio', c.domicilio);
+  setValue('cfg-cuit', c.cuit);
+  if(c.iva) document.getElementById('cfg-iva').value = c.iva;
+  setValue('cfg-iibb', c.iibb);
+  setValue('cfg-inicio', c.inicio);
+  setValue('cfg-tel', c.tel);
+  setValue('cfg-email', c.email);
+  setValue('cfg-nota', c.nota);
+  setValue('cfg-contrato-base', c.contrato_base);
+  setValue('cfg-cuota-next', c.cuota_next);
+};
+
+window.guardarConfig = async function(){
+  const cfg = {
+    razon:          document.getElementById('cfg-razon').value.trim(),
+    domicilio:      document.getElementById('cfg-domicilio').value.trim(),
+    cuit:           document.getElementById('cfg-cuit').value.trim(),
+    iva:            document.getElementById('cfg-iva').value,
+    iibb:           document.getElementById('cfg-iibb').value.trim(),
+    inicio:         document.getElementById('cfg-inicio').value,
+    tel:            document.getElementById('cfg-tel').value.trim(),
+    email:          document.getElementById('cfg-email').value.trim(),
+    nota:           document.getElementById('cfg-nota').value.trim(),
+    contrato_base:  parseInt(document.getElementById('cfg-contrato-base').value) || 1,
+    cuota_next:     parseInt(document.getElementById('cfg-cuota-next').value) || 1,
+    updated_at:     new Date().toISOString(),
+  };
+  try {
+    await setDoc(doc(db,'config','empresa'), cfg);
+    _empresaConfig = cfg;
+    showToast('Configuración guardada','success');
+  } catch(e){ showToast(e.message,'error'); }
+};
+
+window.generarRecibo = async function(pagoId){
+  // Cargar config si no está en memoria
+  if(!_empresaConfig) await loadEmpresaConfig();
+  const emp = _empresaConfig || {};
+
+  const pg = cache.pagos.find(x=>x.id===pagoId); if(!pg) return;
+  const c  = getCont(pg.contrato_id);
+  const p  = c ? getProp(c.propiedad_id) : null;
+  const i  = c ? getInq(c.inquilino_id)  : null;
+  const sv = pg.servicios || {};
+  const moneda = pg.moneda || 'ARS';
+  const prefix = moneda==='USD' ? 'U$D ' : '$ ';
+  const fmt = n => (n && Number(n) > 0) ? prefix + Number(n).toLocaleString('es-AR') : '—';
+  const per = pg.periodo ? pg.periodo.split('-').reverse().join('/') : '—';
+  const hoy = new Date().toLocaleDateString('es-AR');
+
+  const servicioRows = [
+    {label:'Agua',        val:sv.agua},
+    {label:'Luz',         val:sv.luz},
+    {label:'Gas',         val:sv.gas},
+    {label:'Contribución municipal', val:sv.municipal},
+    {label:'Rentas provincial',      val:sv.rentas},
+    {label:sv.otros_label||'Otros',  val:sv.otros},
+  ].filter(s=>s.val>0);
+
+  const totalSv = servicioRows.reduce((s,r)=>s+Number(r.val||0),0);
+  const totalGeneral = Number(pg.monto||0) + totalSv;
+
+  const svHTML = servicioRows.length ? servicioRows.map(s=>`
+    <tr>
+      <td style="padding:10px 16px;border-bottom:1px solid #e8e0d4;">${s.label}</td>
+      <td style="padding:10px 16px;border-bottom:1px solid #e8e0d4;text-align:right;">${fmt(s.val)}</td>
+    </tr>`).join('') : `<tr><td colspan="2" style="padding:10px 16px;color:#999;border-bottom:1px solid #e8e0d4;">Sin servicios cargados</td></tr>`;
+
+  // Número de cupón
+  const nContrato = String(emp.contrato_base || 1).padStart(4,'0');
+  const nCuota    = String(emp.cuota_next    || 1).padStart(12,'0');
+  const numCupon  = `${nContrato}-${nCuota}`;
+
+  // Fecha de vencimiento del pago
+  let fechaVto = '—';
+  if(c?.dia_pago && pg.periodo){
+    const [ay,am] = pg.periodo.split('-');
+    fechaVto = `${String(c.dia_pago).padStart(2,'0')}/${am}/${ay}`;
+  }
+
+  // Nombre del mes
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  let periodoLabel = per;
+  if(pg.periodo){ const [ay,am] = pg.periodo.split('-'); periodoLabel = `${meses[parseInt(am)-1]} - ${ay}`; }
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cupón ${numCupon}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;background:#f2f2f2;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;}
+  .cupon{background:white;width:680px;border:1px solid #ccc;box-shadow:0 2px 12px rgba(0,0,0,0.1);}
+  .cabecera{padding:18px 24px;border-bottom:2px solid #1a1916;}
+  .cabecera-grid{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;}
+  .razon-social{font-size:1rem;font-weight:700;color:#1a1916;margin-bottom:4px;}
+  .cab-dato{font-size:0.78rem;color:#444;margin-bottom:2px;}
+  .cab-derecha{text-align:right;border-left:1px solid #e0e0e0;padding-left:16px;}
+  .cab-derecha .tipo{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#888;margin-bottom:4px;}
+  .cab-derecha .num{font-size:1rem;font-weight:700;color:#1a1916;font-family:monospace;letter-spacing:0.05em;}
+  .cab-derecha .fecha-linea{font-size:0.75rem;color:#666;margin-top:4px;}
+  .invalido{background:#f8f8f8;border-bottom:1px solid #e0e0e0;text-align:center;padding:5px;font-size:0.68rem;color:#888;font-style:italic;letter-spacing:0.05em;}
+  .cuerpo{padding:20px 24px;}
+  .concepto-fila{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:0.85rem;}
+  .concepto-fila:nth-child(odd){background:#fafafa;}
+  .concepto-fila.principal{font-weight:600;background:#fffbf4;}
+  .concepto-fila.total-fila{background:#1a1916;color:white;font-weight:700;font-size:0.95rem;margin-top:2px;border-bottom:none;}
+  .concepto-fila.total-fila span:last-child{color:#c9a96e;font-size:1.05rem;}
+  .concepto-header{display:flex;justify-content:space-between;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;padding:7px 12px;border-bottom:1px solid #ddd;background:#f5f5f5;}
+  .datos-inquilino{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#f8f8f8;border-radius:4px;padding:12px;margin-bottom:16px;}
+  .dato-item{font-size:0.78rem;} .dato-item label{color:#888;display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;} .dato-item span{font-weight:500;color:#1a1916;}
+  .nota{background:#fff8e8;border-left:3px solid #c9a96e;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:16px;line-height:1.6;}
+  .pie{border-top:1px solid #e0e0e0;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;background:#f8f8f8;}
+  .pie p{font-size:0.7rem;color:#999;}
+  .no-print{margin-left:12px;}
+  @media print{
+    body{background:white;padding:0;}
+    .cupon{box-shadow:none;width:100%;border:none;}
+    .no-print{display:none!important;}
+  }
+</style>
+</head>
+<body>
+<div class="cupon">
+
+  <div class="invalido">${emp.nota || 'Documento no válido como comprobante de pago'}</div>
+
+  <div class="cabecera">
+    <div class="cabecera-grid">
+      <div>
+        <div class="razon-social">${emp.razon || 'GestorProp'}</div>
+        ${emp.domicilio ? `<div class="cab-dato">📍 ${emp.domicilio}</div>` : ''}
+        ${emp.cuit     ? `<div class="cab-dato">CUIT: ${emp.cuit}</div>` : ''}
+        ${emp.iva      ? `<div class="cab-dato">Condición IVA: ${emp.iva}</div>` : ''}
+        ${emp.iibb     ? `<div class="cab-dato">Ingresos Brutos: ${emp.iibb}</div>` : ''}
+        ${emp.inicio   ? `<div class="cab-dato">Inicio de Actividades: ${new Date(emp.inicio+'T12:00:00').toLocaleDateString('es-AR')}</div>` : ''}
+      </div>
+      <div class="cab-derecha">
+        <div class="tipo">Cupón de Pago</div>
+        <div class="num">${numCupon}</div>
+        <div class="fecha-linea">Emisión: ${hoy}</div>
+        <div class="fecha-linea">Vencimiento: ${fechaVto}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cuerpo">
+    <div class="datos-inquilino">
+      <div class="dato-item"><label>Inquilino</label><span>${i?.nombre||'—'}</span></div>
+      <div class="dato-item"><label>DNI / CUIT</label><span>${i?.dni||'—'}</span></div>
+      <div class="dato-item"><label>Propiedad</label><span>${p?.direccion||'—'}${p?.piso?' · '+p.piso:''}</span></div>
+      <div class="dato-item"><label>Período</label><span>${periodoLabel}</span></div>
+      ${c?.expediente ? `<div class="dato-item"><label>N° Expediente</label><span>${c.expediente}</span></div>` : ''}
+      <div class="dato-item"><label>Propietario</label><span>${getPropietario(p?.propietario_id)?.nombre||'—'}</span></div>
+    </div>
+
+    <div class="concepto-header"><span>Concepto</span><span>Importe</span></div>
+    <div class="concepto-fila principal">
+      <span>Alquiler mensual — ${periodoLabel}</span>
+      <span>${fmt(pg.monto)}</span>
+    </div>
+    ${svHTML}
+    <div class="concepto-fila total-fila">
+      <span>IMPORTE TOTAL</span>
+      <span>${fmt(totalGeneral)}</span>
+    </div>
+
+    ${pg.notas ? `<div class="nota">📋 <strong>Nota:</strong> ${pg.notas}</div>` : ''}
+  </div>
+
+  <div class="pie">
+    <p>Cupón generado el ${hoy} · GestorProp${emp.tel ? ' · ' + emp.tel : ''}${emp.email ? ' · ' + emp.email : ''}</p>
+    <button onclick="window.print()" class="no-print" style="background:#1a1916;color:#c9a96e;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+
+  // Incrementar número de cuota para el próximo cupón
+  if(emp.cuota_next){
+    const nextNum = (parseInt(emp.cuota_next) || 1) + 1;
+    try {
+      await updateDoc(doc(db,'config','empresa'),{ cuota_next: nextNum });
+      if(_empresaConfig) _empresaConfig.cuota_next = nextNum;
+    } catch(e){}
+  }
+};
 
 </script>
 </body>
