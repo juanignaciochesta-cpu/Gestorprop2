@@ -588,17 +588,18 @@ async function loadAllData(){
   ];
   if(isAdmin()) loads.push(getDocs(collection(db,'inquilinos')));
   if(isAdmin()) loads.push(getDocs(collection(db,'cupones')));
-  loads.push(getDocs(collection(db,'actualizaciones')));
 
-  const [usuSnap, propSnap, contSnap, pagSnap, inqSnap, cupSnap, actSnap] = await Promise.all(loads);
+  const [usuSnap, propSnap, contSnap, pagSnap, inqSnap, cupSnap] = await Promise.all(loads);
 
-  cache.propietarios = usuSnap.docs.map(d=>({id:d.id,...d.data()}));
-  cache.propiedades  = propSnap.docs.map(d=>({id:d.id,...d.data()}));
-  cache.contratos    = contSnap.docs.map(d=>({id:d.id,...d.data()}));
-  cache.pagos        = pagSnap.docs.map(d=>({id:d.id,...d.data()}));
-  cache.inquilinos   = inqSnap ? inqSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
-  cache.cupones        = cupSnap ? cupSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
-  cache.actualizaciones = actSnap ? actSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
+  cache.propietarios    = usuSnap.docs.map(d=>({id:d.id,...d.data()}));
+  cache.propiedades     = propSnap.docs.map(d=>({id:d.id,...d.data()}));
+  cache.contratos       = contSnap.docs.map(d=>({id:d.id,...d.data()}));
+  cache.pagos           = pagSnap.docs.map(d=>({id:d.id,...d.data()}));
+  cache.inquilinos      = inqSnap ? inqSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
+  cache.cupones         = cupSnap ? cupSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
+  // Actualizaciones siempre para todos los roles — carga separada para evitar bug de destructuring
+  const actSnap = await getDocs(collection(db,'actualizaciones'));
+  cache.actualizaciones = actSnap.docs.map(d=>({id:d.id,...d.data()}));
 
   // Si no es admin, filtrar solo sus propiedades
   if(!isAdmin()){
