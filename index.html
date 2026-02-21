@@ -588,7 +588,7 @@ async function loadAllData(){
   ];
   if(isAdmin()) loads.push(getDocs(collection(db,'inquilinos')));
   if(isAdmin()) loads.push(getDocs(collection(db,'cupones')));
-  if(isAdmin()) loads.push(getDocs(collection(db,'actualizaciones')));
+  loads.push(getDocs(collection(db,'actualizaciones')));
 
   const [usuSnap, propSnap, contSnap, pagSnap, inqSnap, cupSnap, actSnap] = await Promise.all(loads);
 
