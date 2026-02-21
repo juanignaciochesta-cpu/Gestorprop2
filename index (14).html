@@ -6,17 +6,17 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://identitytoolkit.googleapis.com; connect-src https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
 <meta name="referrer" content="no-referrer">
 <title>TerraLex — Gestión de Propiedades</title>
-<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0b1519;--surface:#152530;--surface2:#1c3040;--border:#254050;--accent:#917860;--accent2:#b09070;--text:#f0ece4;--muted:#7a96a8;--danger:#c96e6e;--success:#6ec98a;--warning:#c9b96e;--info:#6ea0c9;}
+:root{--bg:#0f0e0c;--surface:#1a1916;--surface2:#242220;--border:#2e2c28;--accent:#c9a96e;--accent2:#e8c987;--text:#f0ece4;--muted:#8a8070;--danger:#c96e6e;--success:#6ec98a;--warning:#c9b96e;--info:#6ea0c9;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 30% 20%,rgba(201,169,110,0.07) 0%,transparent 60%);}
 .login-box{width:420px;max-width:100%;}
 .login-logo{text-align:center;margin-bottom:40px;}
 .login-logo h1{font-family:'Playfair Display',serif;font-size:2.4rem;color:var(--accent);}
 .login-logo p{color:var(--muted);font-size:0.85rem;margin-top:6px;letter-spacing:0.08em;text-transform:uppercase;}
-.login-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:36px;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;}
 .login-card h2{font-size:1.1rem;font-weight:600;margin-bottom:24px;}
 .form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
 label{font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;}
@@ -24,7 +24,7 @@ input,select,textarea{background:var(--bg);border:1px solid var(--border);border
 input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 select option{background:var(--surface);}
 textarea{resize:vertical;min-height:80px;}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:8px;border:none;font-family:'Lato',sans-serif;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all 0.2s;text-decoration:none;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.2s;text-decoration:none;}
 .btn-primary{background:var(--accent);color:#0f0e0c;width:100%;}
 .btn-primary:hover{background:var(--accent2);}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
@@ -181,9 +181,7 @@ tr:hover td{background:var(--surface2);}
 <!-- APP -->
 <div class="app" id="app">
   <aside class="sidebar">
-    <div class="logo">
-      <h1>TerraLex</h1><span>Gestión de Propiedades</span>
-    </div>
+    <div class="logo"><h1>TerraLex</h1><span>Gestión de Propiedades</span></div>
     <div class="user-pill">
       <div class="user-avatar" id="userAvatar">?</div>
       <div style="flex:1;overflow:hidden;">
@@ -1100,8 +1098,8 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#eee;padding:30px 
 .fila:nth-child(odd){background:#fafafa;}
 .fila.principal{font-weight:600;background:#fffbf4;}
 .fila.total{background:#111;color:white;font-weight:700;font-size:0.92rem;border-radius:0 0 4px 4px;}
-.fila.total span:last-child{color:#917860;}
-.nota{background:#fffbf0;border-left:3px solid #917860;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:14px;line-height:1.6;}
+.fila.total span:last-child{color:#c9a96e;}
+.nota{background:#fffbf0;border-left:3px solid #c9a96e;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:14px;line-height:1.6;}
 .pie{background:#f5f5f5;border-top:1px solid #ddd;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;}
 .pie p{font-size:0.7rem;color:#999;}
 @media print{body{background:white;padding:0;}.cupon{box-shadow:none;border:none;width:100%;}.no-print{display:none!important;}}
@@ -1140,7 +1138,7 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#eee;padding:30px 
   </div>
   <div class="pie">
     <p>Generado el ${hoy}${emp.tel?' · '+emp.tel:''}${emp.email?' · '+emp.email:''}</p>
-    <button onclick="window.print()" class="no-print" style="background:#111;color:#917860;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
+    <button onclick="window.print()" class="no-print" style="background:#111;color:#c9a96e;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
   </div>
 </div>
 </body></html>`;
@@ -1342,11 +1340,11 @@ window.generarRecibo = async function(pagoId){
   .concepto-fila:nth-child(odd){background:#fafafa;}
   .concepto-fila.principal{font-weight:600;background:#fffbf4;}
   .concepto-fila.total-fila{background:#1a1916;color:white;font-weight:700;font-size:0.95rem;margin-top:2px;border-bottom:none;}
-  .concepto-fila.total-fila span:last-child{color:#917860;font-size:1.05rem;}
+  .concepto-fila.total-fila span:last-child{color:#c9a96e;font-size:1.05rem;}
   .concepto-header{display:flex;justify-content:space-between;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;padding:7px 12px;border-bottom:1px solid #ddd;background:#f5f5f5;}
   .datos-inquilino{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#f8f8f8;border-radius:4px;padding:12px;margin-bottom:16px;}
   .dato-item{font-size:0.78rem;} .dato-item label{color:#888;display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;} .dato-item span{font-weight:500;color:#1a1916;}
-  .nota{background:#fff8e8;border-left:3px solid #917860;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:16px;line-height:1.6;}
+  .nota{background:#fff8e8;border-left:3px solid #c9a96e;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:16px;line-height:1.6;}
   .pie{border-top:1px solid #e0e0e0;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;background:#f8f8f8;}
   .pie p{font-size:0.7rem;color:#999;}
   .no-print{margin-left:12px;}
@@ -1407,7 +1405,7 @@ window.generarRecibo = async function(pagoId){
 
   <div class="pie">
     <p>Cupón generado el ${hoy} · TerraLex${emp.tel ? ' · ' + emp.tel : ''}${emp.email ? ' · ' + emp.email : ''}</p>
-    <button onclick="window.print()" class="no-print" style="background:#1a1916;color:#917860;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
+    <button onclick="window.print()" class="no-print" style="background:#1a1916;color:#c9a96e;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
   </div>
 </div>
 </body>
