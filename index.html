@@ -489,7 +489,7 @@ function esc(str){
 let auth, db;
 let currentUser = null;
 let currentProfile = null;
-let cache = { propiedades:[], propietarios:[], inquilinos:[], contratos:[], pagos:[], cupones:[] };
+let cache = { propiedades:[], propietarios:[], inquilinos:[], contratos:[], pagos:[], cupones:[], actualizaciones:[] };
 let editMode = { type:null, id:null };
 
 // ═══════════════════════════════════════
@@ -564,7 +564,7 @@ window.doLogin = async function(){
 window.doLogout = async function(){
   await signOut(auth);
   currentUser=null; currentProfile=null;
-  cache={ propiedades:[], propietarios:[], inquilinos:[], contratos:[], pagos:[], cupones:[] };
+  cache={ propiedades:[], propietarios:[], inquilinos:[], contratos:[], pagos:[], cupones:[], actualizaciones:[] };
 };
 
 window.resetPass = async function(){
@@ -588,15 +588,17 @@ async function loadAllData(){
   ];
   if(isAdmin()) loads.push(getDocs(collection(db,'inquilinos')));
   if(isAdmin()) loads.push(getDocs(collection(db,'cupones')));
+  if(isAdmin()) loads.push(getDocs(collection(db,'actualizaciones')));
 
-  const [usuSnap, propSnap, contSnap, pagSnap, inqSnap, cupSnap] = await Promise.all(loads);
+  const [usuSnap, propSnap, contSnap, pagSnap, inqSnap, cupSnap, actSnap] = await Promise.all(loads);
 
   cache.propietarios = usuSnap.docs.map(d=>({id:d.id,...d.data()}));
   cache.propiedades  = propSnap.docs.map(d=>({id:d.id,...d.data()}));
   cache.contratos    = contSnap.docs.map(d=>({id:d.id,...d.data()}));
   cache.pagos        = pagSnap.docs.map(d=>({id:d.id,...d.data()}));
   cache.inquilinos   = inqSnap ? inqSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
-  cache.cupones      = cupSnap ? cupSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
+  cache.cupones        = cupSnap ? cupSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
+  cache.actualizaciones = actSnap ? actSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
 
   // Si no es admin, filtrar solo sus propiedades
   if(!isAdmin()){
@@ -956,17 +958,18 @@ function calcAlertas(){
       const ini=new Date(fi+'T00:00:00'); const mt=(anio-ini.getFullYear())*12+(mes-(ini.getMonth()+1));
       const actInfo = calcActualizaciones(c);
       if(actInfo.ultimaRaw){
-        // ROJA: la última fecha de actualización ya pasó (el ajuste no se hizo)
-        // diasUltima > 0 significa que ultDate ya quedó atrás
-        if(actInfo.diasUltima > 0){
+        // Verificar si ya se registró la actualización para este ciclo
+        const yaActualizado = cache.actualizaciones.some(a => a.contrato_id === c.id && a.periodo === actInfo.ultima);
+        if(actInfo.diasUltima > 0 && !yaActualizado){
+          // ROJA: fecha pasó y no se registró actualización
           alertas.push({tipo:'actualizacion-vencida', urgencia:'red', dias:actInfo.diasUltima, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
-        } else if(actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
-          // NARANJA: la próxima actualización es en menos de 20 días
+        } else if(!yaActualizado && actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
+          // NARANJA: próxima en menos de 20 días y no se registró
           alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
         }
       } else if(actInfo.proximaRaw && actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
-        // Contrato nuevo sin ciclos aún, pero la primera actualización está próxima
-        alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
+        const yaActualizado = cache.actualizaciones.some(a => a.contrato_id === c.id && a.periodo === actInfo.proxima);
+        if(!yaActualizado) alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
       }
     }
     if(c.dia_pago){
@@ -982,15 +985,13 @@ function renderAlertas(){
   const alertas=calcAlertas(); const el=document.getElementById('alertasContent');
   if(!alertas.length){ el.innerHTML=`<div class="card" style="text-align:center;padding:60px"><div style="font-size:3rem;margin-bottom:14px">✅</div><strong>Todo en orden</strong><p style="color:var(--muted);margin-top:6px">Sin alertas pendientes.</p></div>`; return; }
   const sec=(items,title,icon,cls)=>{ if(!items.length) return ''; return `<div class="alerts-section"><div class="alerts-section-title">${icon} ${title} (${items.length})</div>`+items.map(a=>{ const pN=a.p?.direccion||'?'; const iN=a.i?.nombre||'?'; let tit='',sub='',act=''; if(a.tipo==='contrato-vencido'){tit=`Contrato VENCIDO — ${pN}`;sub=`Inquilino: ${iN} · Venció el ${fmtDate(a.c.fecha_vencimiento)}`;} else if(a.tipo==='contrato-vencer'){tit=`Contrato por vencer — ${pN}`;sub=`Inquilino: ${iN} · Vence en ${a.dias} días`;} else if(a.tipo==='actualizacion-vencida'){
-          const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
           tit=`🔴 Actualización VENCIDA — ${pN}`;
           sub=`${iN} · Monto actual: ${fmtMoney(a.c.monto,a.c.moneda)} · Índice: ${esc(a.c.indice)} · Debió actualizarse en: ${a.ultimaLabel} (hace ${Math.abs(a.dias)} días)`;
-          act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular nuevo monto</a>`;
+          act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular nuevo monto</a>${isAdmin()?` <button class="btn btn-success btn-xs" onclick="marcarActualizacion('${a.c.id}','${a.ultimaLabel}')">✅ Actualización efectuada</button>`:''}`;
         } else if(a.tipo==='actualizacion-proxima'){
-          const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
           tit=`⚠️ Actualización en ${a.dias} días — ${pN}`;
           sub=`${iN} · Monto actual: ${fmtMoney(a.c.monto,a.c.moneda)} · Índice: ${esc(a.c.indice)} · Actualizar en: ${a.proximaLabel}`;
-          act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular nuevo monto</a>`;
+          act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular nuevo monto</a>${isAdmin()?` <button class="btn btn-success btn-xs" onclick="marcarActualizacion('${a.c.id}','${a.proximaLabel}')">✅ Actualización efectuada</button>`:''}`;
         } else if(a.tipo==='pago-atrasado'){tit=`Pago ATRASADO — ${pN}`;sub=`${iN} · Vencía el día ${a.diaPago}`;if(isAdmin())act=`<button class="btn btn-primary btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} else if(a.tipo==='pago-proximo'){tit=`Pago próximo — ${pN}`;sub=`${iN} · Vence el día ${a.diaPago} (en ${a.dias} días)`;if(isAdmin())act=`<button class="btn btn-ghost btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} return `<div class="alert-card ${cls}"><div style="font-size:1.1rem">🔔</div><div class="alert-card-body"><div class="alert-card-title">${tit}</div><div class="alert-card-sub">${sub}</div><div class="alert-card-actions">${act}</div></div></div>`; }).join('')+'</div>'; };
   el.innerHTML=sec(alertas.filter(a=>a.tipo==='pago-atrasado'),'Pagos Atrasados','🚨','red')+sec(alertas.filter(a=>a.tipo==='contrato-vencido'),'Contratos Vencidos','📛','red')+sec(alertas.filter(a=>a.tipo==='actualizacion-vencida'),'Actualizaciones VENCIDAS — Actualizar ya','🔴','red')+sec(alertas.filter(a=>a.tipo==='actualizacion-proxima'),'Actualizaciones Próximas — Menos de 20 días','⚠️','yellow')+sec(alertas.filter(a=>a.tipo==='pago-proximo'),'Pagos Próximos','⏰','yellow')+sec(alertas.filter(a=>a.tipo==='contrato-vencer'),'Contratos por Vencer','📋','yellow');
 }
@@ -1015,7 +1016,7 @@ function renderDashboard(){
       ${actVencidas.map(a=>`
         <div style="font-size:0.83rem;color:var(--text);margin-bottom:6px;padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
           <span>📍 <strong>${esc(a.p?.direccion)||'—'}</strong> · ${esc(a.i?.nombre)||'—'} · ${fmtMoney(a.c.monto,a.c.moneda)} · <em>${esc(a.c.indice)}</em> · <span style="color:var(--danger);">Debió actualizarse: ${a.ultimaLabel}</span></span>
-          <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>
+          <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>${isAdmin()?`<button class="btn btn-success btn-xs" style="margin-left:6px;white-space:nowrap;" onclick="marcarActualizacion('${a.c.id}','${a.ultimaLabel}')">✅ Efectuada</button>`:''}
         </div>`).join('')}
     </div>
   </div>` : ''}
@@ -1027,7 +1028,7 @@ ${actProximas.length ? `
       ${actProximas.map(a=>`
         <div style="font-size:0.83rem;color:var(--text);margin-bottom:6px;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
           <span>📍 <strong>${esc(a.p?.direccion)||'—'}</strong> · ${esc(a.i?.nombre)||'—'} · ${fmtMoney(a.c.monto,a.c.moneda)} · <em>${esc(a.c.indice)}</em> · Actualizar en: <strong>${a.proximaLabel}</strong> (${a.dias} días)</span>
-          <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>
+          <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>${isAdmin()?`<button class="btn btn-success btn-xs" style="margin-left:6px;white-space:nowrap;" onclick="marcarActualizacion('${a.c.id}','${a.ultimaLabel}')">✅ Efectuada</button>`:''}
         </div>`).join('')}
     </div>
   </div>` : ''}
@@ -1289,6 +1290,25 @@ window.anularCupon = async function(id){
 };
 
 window.filterCupones = function(val){ renderCupones(val.toLowerCase().trim()); };
+
+window.marcarActualizacion = async function(contratoId, periodo){
+  if(!confirm(`¿Confirmar actualización efectuada para ${periodo}?`)) return;
+  try {
+    await addDoc(collection(db,'actualizaciones'),{
+      contrato_id: contratoId,
+      periodo,
+      fecha: new Date().toISOString().split('T')[0],
+      registrado_por: auth.currentUser?.uid || '',
+      created_at: new Date().toISOString()
+    });
+    // Actualizar cache local
+    cache.actualizaciones.push({ contrato_id: contratoId, periodo });
+    showToast('Actualización registrada','success');
+    updateAlertBadge();
+    renderAlertas();
+    renderDashboard();
+  } catch(e){ showToast(e.message,'error'); }
+};
 
 window.filterTable = function(type,val){ const f=val.toLowerCase().trim(); ({propiedades:renderPropiedades,inquilinos:renderInquilinos,contratos:renderContratos,pagos:renderPagos})[type]?.(f); };
 
