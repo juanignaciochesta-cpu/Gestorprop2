@@ -217,7 +217,7 @@ tr:hover td{background:var(--surface2);}
     <div class="page" id="page-contratos">
       <div class="page-header"><div><div class="page-title">Contratos</div></div><div id="contratoActions"></div></div>
       <div class="table-wrap"><div class="table-toolbar"><input class="search-input" placeholder="Buscar..." oninput="filterTable('contratos',this.value)"></div>
-      <table><thead><tr><th>Propiedad</th><th>Inquilino</th><th>Inicio</th><th>Vencimiento</th><th>Alquiler</th><th>Actualización</th><th>Estado</th><th></th></tr></thead><tbody id="tbody-contratos"></tbody></table></div>
+      <table><thead><tr><th>Propiedad</th><th>Inquilino</th><th>Inicio</th><th>Vencimiento</th><th>Alquiler</th><th>Actualización</th><th>Últ. actualización</th><th>Próx. actualización</th><th>Estado</th><th></th></tr></thead><tbody id="tbody-contratos"></tbody></table></div>
     </div>
     <div class="page" id="page-cupones">
       <div class="page-header">
@@ -831,13 +831,44 @@ window.guardarContrato = async function(){
     showToast('Contrato guardado','success'); closeModal('modalContrato'); await loadAllData(); renderContratos();
   } catch(e){ showToast(e.message,'error'); }
 };
+function calcActualizaciones(c){
+  if(!c.fecha_inicio || !c.actualizacion_meses) return { ultima: '—', proxima: '—', proximaRaw: null };
+  const fi = typeof c.fecha_inicio==='string' ? c.fecha_inicio : c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
+  const ini = new Date(fi+'T00:00:00');
+  const hoy = new Date();
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const fmtMes = d => `${meses[d.getMonth()]} ${d.getFullYear()}`;
+  const freq = parseInt(c.actualizacion_meses);
+
+  // Calcular cuántos ciclos completos han pasado
+  const mt = (hoy.getFullYear() - ini.getFullYear()) * 12 + (hoy.getMonth() - ini.getMonth());
+  if(mt < freq) {
+    // Todavía no hubo ninguna actualización
+    const proxDate = new Date(ini);
+    proxDate.setMonth(proxDate.getMonth() + freq);
+    return { ultima: 'Sin actualizaciones aún', proxima: fmtMes(proxDate), proximaRaw: proxDate };
+  }
+  const ciclos = Math.floor(mt / freq);
+  // Última actualización
+  const ultDate = new Date(ini);
+  ultDate.setMonth(ultDate.getMonth() + ciclos * freq);
+  // Próxima actualización
+  const proxDate = new Date(ini);
+  proxDate.setMonth(proxDate.getMonth() + (ciclos + 1) * freq);
+  // Días hasta la próxima
+  const diasProx = Math.round((proxDate - hoy) / (1000*60*60*24));
+  return { ultima: fmtMes(ultDate), proxima: fmtMes(proxDate), proximaRaw: proxDate, diasProx };
+}
+
 function contratoEst(c){ if(!c.fecha_vencimiento) return {l:'Activo',cls:'badge-green'}; const d=diasHasta(c.fecha_vencimiento); if(d<0) return {l:'Vencido',cls:'badge-red'}; if(d<=60) return {l:`${d}d`,cls:'badge-yellow'}; return {l:'Activo',cls:'badge-green'}; }
 function renderContratos(filter=''){
   const tbody=document.getElementById('tbody-contratos');
   let rows=cache.contratos; if(filter) rows=rows.filter(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
   if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">📄</div><p>No hay contratos</p></div></td></tr>`; return; }
   const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
-  tbody.innerHTML=rows.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const e=contratoEst(c); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editContrato('${c.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delContrato('${c.id}')">✕</button>`:''; return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${fmtDate(c.fecha_inicio)}</td><td>${fmtDate(c.fecha_vencimiento)}</td><td><strong>${fmtMoney(c.monto,c.moneda)}</strong></td><td style="font-size:.76rem">${fl[c.actualizacion_meses]||c.actualizacion_meses+'m'} / ${esc(c.indice)}</td><td><span class="badge ${e.cls}">${e.l}</span></td><td><div class="actions"><a href="${arquilerLink(c)}" target="_blank" class="arquiler-btn">🔗</a>${acts}</div></td></tr>`; }).join('');
+  tbody.innerHTML=rows.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const e=contratoEst(c); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editContrato('${c.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delContrato('${c.id}')">✕</button>`:''; const act=calcActualizaciones(c);
+    const proximaBadge = act.proximaRaw ? (act.diasProx<=30&&act.diasProx>=0 ? `<span style="color:var(--warning);font-weight:700;">⚠️ ${act.proxima}</span>` : act.diasProx<0 ? `<span style="color:var(--danger);font-weight:700;">❗ ${act.proxima}</span>` : act.proxima) : act.proxima;
+    return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${fmtDate(c.fecha_inicio)}</td><td>${fmtDate(c.fecha_vencimiento)}</td><td><strong>${fmtMoney(c.monto,c.moneda)}</strong></td><td style="font-size:.76rem">${fl[c.actualizacion_meses]||c.actualizacion_meses+'m'} / ${esc(c.indice)}</td><td style="font-size:.8rem">${esc(act.ultima)}</td><td style="font-size:.8rem">${proximaBadge}</td><td><span class="badge ${e.cls}">${e.l}</span></td><td><div class="actions"><a href="${arquilerLink(c)}" target="_blank" class="arquiler-btn">🔗</a>${acts}</div></td></tr>`; }).join('');
 }
 window.editContrato = function(id){ const c=getCont(id); if(!c) return; editMode={type:'contratos',id}; openContratoModal(); setTimeout(()=>{ document.getElementById('c-prop').value=c.propiedad_id||''; document.getElementById('c-inq').value=c.inquilino_id||''; document.getElementById('c-ini').value=c.fecha_inicio||''; document.getElementById('c-ven').value=c.fecha_vencimiento||''; document.getElementById('c-monto').value=c.monto||''; document.getElementById('c-mon').value=c.moneda||'ARS'; document.getElementById('c-ind').value=c.indice||'IPC'; document.getElementById('c-frec').value=c.actualizacion_meses||3; document.getElementById('c-dia').value=c.dia_pago||''; document.getElementById('c-grac').value=c.dias_gracia||5; document.getElementById('c-dep').value=c.deposito||''; document.getElementById('c-exp').value=c.expediente||''; document.getElementById('c-notas').value=c.notas||''; document.getElementById('titleContrato').textContent='Editar Contrato'; },50); };
 window.delContrato = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'contratos',id)); await loadAllData(); renderContratos(); showToast('Eliminado'); };
