@@ -856,8 +856,9 @@ function calcActualizaciones(c){
   const proxDate = new Date(ini);
   proxDate.setMonth(proxDate.getMonth() + (ciclos + 1) * freq);
   // Días hasta la próxima
-  const diasProx = Math.round((proxDate - hoy) / (1000*60*60*24));
-  return { ultima: fmtMes(ultDate), proxima: fmtMes(proxDate), proximaRaw: proxDate, diasProx };
+  const diasProx  = Math.round((proxDate - hoy) / (1000*60*60*24));
+  const diasUltima = Math.round((hoy - ultDate)  / (1000*60*60*24)); // días transcurridos desde la última
+  return { ultima: fmtMes(ultDate), proxima: fmtMes(proxDate), ultimaRaw: ultDate, proximaRaw: proxDate, diasProx, diasUltima };
 }
 
 function contratoEst(c){ if(!c.fecha_vencimiento) return {l:'Activo',cls:'badge-green'}; const d=diasHasta(c.fecha_vencimiento); if(d<0) return {l:'Vencido',cls:'badge-red'}; if(d<=60) return {l:`${d}d`,cls:'badge-yellow'}; return {l:'Activo',cls:'badge-green'}; }
@@ -953,15 +954,18 @@ function calcAlertas(){
       const fi=typeof c.fecha_inicio==='string'?c.fecha_inicio:c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
       const ini=new Date(fi+'T00:00:00'); const mt=(anio-ini.getFullYear())*12+(mes-(ini.getMonth()+1));
       const actInfo = calcActualizaciones(c);
-      if(actInfo.proximaRaw){
-        const diasProx = actInfo.diasProx;
-        if(diasProx < 0){
-          // Ya venció — alerta ROJA sin importar hace cuánto
-          alertas.push({tipo:'actualizacion-vencida', urgencia:'red', dias:diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
-        } else if(diasProx <= 20){
-          // Faltan 20 días o menos — alerta NARANJA
-          alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
+      if(actInfo.ultimaRaw){
+        // ROJA: la última fecha de actualización ya pasó (el ajuste no se hizo)
+        // diasUltima > 0 significa que ultDate ya quedó atrás
+        if(actInfo.diasUltima > 0){
+          alertas.push({tipo:'actualizacion-vencida', urgencia:'red', dias:actInfo.diasUltima, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
+        } else if(actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
+          // NARANJA: la próxima actualización es en menos de 20 días
+          alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
         }
+      } else if(actInfo.proximaRaw && actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
+        // Contrato nuevo sin ciclos aún, pero la primera actualización está próxima
+        alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
       }
     }
     if(c.dia_pago){
