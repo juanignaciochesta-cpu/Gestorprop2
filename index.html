@@ -843,10 +843,11 @@ function calcActualizaciones(c){
   // Calcular cuántos ciclos completos han pasado
   const mt = (hoy.getFullYear() - ini.getFullYear()) * 12 + (hoy.getMonth() - ini.getMonth());
   if(mt < freq) {
-    // Todavía no hubo ninguna actualización
+    // Todavía no hubo ninguna actualización — primera actualización próxima
     const proxDate = new Date(ini);
     proxDate.setMonth(proxDate.getMonth() + freq);
-    return { ultima: 'Sin actualizaciones aún', proxima: fmtMes(proxDate), proximaRaw: proxDate };
+    const diasProx = Math.round((proxDate - hoy) / (1000*60*60*24));
+    return { ultima: 'Sin actualizaciones aún', proxima: fmtMes(proxDate), proximaRaw: proxDate, diasProx, ultimaRaw: null, diasUltima: null };
   }
   const ciclos = Math.floor(mt / freq);
   // Última actualización
