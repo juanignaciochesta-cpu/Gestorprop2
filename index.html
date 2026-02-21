@@ -6,17 +6,17 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://identitytoolkit.googleapis.com; connect-src https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
 <meta name="referrer" content="no-referrer">
 <title>TerraLex — Gestión de Propiedades</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0f0e0c;--surface:#1a1916;--surface2:#242220;--border:#2e2c28;--accent:#c9a96e;--accent2:#e8c987;--text:#f0ece4;--muted:#8a8070;--danger:#c96e6e;--success:#6ec98a;--warning:#c9b96e;--info:#6ea0c9;}
+:root{--bg:#0b1519;--surface:#152530;--surface2:#1c3040;--border:#254050;--accent:#917860;--accent2:#b09070;--text:#f0ece4;--muted:#7a96a8;--danger:#c96e6e;--success:#6ec98a;--warning:#c9b96e;--info:#6ea0c9;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 30% 20%,rgba(201,169,110,0.07) 0%,transparent 60%);}
 .login-box{width:420px;max-width:100%;}
 .login-logo{text-align:center;margin-bottom:40px;}
 .login-logo h1{font-family:'Playfair Display',serif;font-size:2.4rem;color:var(--accent);}
 .login-logo p{color:var(--muted);font-size:0.85rem;margin-top:6px;letter-spacing:0.08em;text-transform:uppercase;}
-.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:36px;}
 .login-card h2{font-size:1.1rem;font-weight:600;margin-bottom:24px;}
 .form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
 label{font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;}
@@ -24,7 +24,7 @@ input,select,textarea{background:var(--bg);border:1px solid var(--border);border
 input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 select option{background:var(--surface);}
 textarea{resize:vertical;min-height:80px;}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.2s;text-decoration:none;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:8px;border:none;font-family:'Lato',sans-serif;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all 0.2s;text-decoration:none;}
 .btn-primary{background:var(--accent);color:#0f0e0c;width:100%;}
 .btn-primary:hover{background:var(--accent2);}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
@@ -181,7 +181,9 @@ tr:hover td{background:var(--surface2);}
 <!-- APP -->
 <div class="app" id="app">
   <aside class="sidebar">
-    <div class="logo"><h1>TerraLex</h1><span>Gestión de Propiedades</span></div>
+    <div class="logo">
+      <h1>TerraLex</h1><span>Gestión de Propiedades</span>
+    </div>
     <div class="user-pill">
       <div class="user-avatar" id="userAvatar">?</div>
       <div style="flex:1;overflow:hidden;">
@@ -919,7 +921,7 @@ function calcAlertas(){
     if(c.fecha_inicio&&c.actualizacion_meses){
       const fi=typeof c.fecha_inicio==='string'?c.fecha_inicio:c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
       const ini=new Date(fi+'T00:00:00'); const mt=(anio-ini.getFullYear())*12+(mes-(ini.getMonth()+1));
-      if(mt>=c.actualizacion_meses){ const ciclos=Math.floor(mt/c.actualizacion_meses); const pma=ini.getMonth()+1+ciclos*c.actualizacion_meses; const pa=ini.getFullYear()+Math.floor((ini.getMonth()+pma-1)/12); const pm=((pma-1)%12)+1; const pf=`${pa}-${String(pm).padStart(2,'0')}-${String(ini.getDate()).padStart(2,'0')}`; const d=diasHasta(pf); if(d>=-15&&d<=30) alertas.push({tipo:'actualizacion',urgencia:d<0?'red':'yellow',dias:d,c,p,i,proxFecha:pf}); }
+      if(mt>=c.actualizacion_meses){ const ciclos=Math.floor(mt/c.actualizacion_meses); const pma=ini.getMonth()+1+ciclos*c.actualizacion_meses; const pa=ini.getFullYear()+Math.floor((ini.getMonth()+pma-1)/12); const pm=((pma-1)%12)+1; const pf=`${pa}-${String(pm).padStart(2,'0')}-${String(ini.getDate()).padStart(2,'0')}`; const d=diasHasta(pf); if(d>=-15&&d<=30) alertas.push({tipo:'actualizacion',urgencia:d<0?'red':'yellow',dias:d,c,p,i,proxFecha:pf}); else if(d>30&&d<=60) alertas.push({tipo:'actualizacion-proxima',urgencia:'orange',dias:d,c,p,i,proxFecha:pf}); }
     }
     if(c.dia_pago){
       const dp=parseInt(c.dia_pago); const gr=parseInt(c.dias_gracia)||5; const per=`${anio}-${String(mes).padStart(2,'0')}`;
@@ -933,15 +935,15 @@ function updateAlertBadge(){ const n=calcAlertas().length; const b=document.getE
 function renderAlertas(){
   const alertas=calcAlertas(); const el=document.getElementById('alertasContent');
   if(!alertas.length){ el.innerHTML=`<div class="card" style="text-align:center;padding:60px"><div style="font-size:3rem;margin-bottom:14px">✅</div><strong>Todo en orden</strong><p style="color:var(--muted);margin-top:6px">Sin alertas pendientes.</p></div>`; return; }
-  const sec=(items,title,icon,cls)=>{ if(!items.length) return ''; return `<div class="alerts-section"><div class="alerts-section-title">${icon} ${title} (${items.length})</div>`+items.map(a=>{ const pN=a.p?.direccion||'?'; const iN=a.i?.nombre||'?'; let tit='',sub='',act=''; if(a.tipo==='contrato-vencido'){tit=`Contrato VENCIDO — ${pN}`;sub=`Inquilino: ${iN} · Venció el ${fmtDate(a.c.fecha_vencimiento)}`;} else if(a.tipo==='contrato-vencer'){tit=`Contrato por vencer — ${pN}`;sub=`Inquilino: ${iN} · Vence en ${a.dias} días`;} else if(a.tipo==='actualizacion'){const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};tit=`Actualización ${fl[a.c.actualizacion_meses]||''} — ${pN}`;sub=`${iN} · ${fmtMoney(a.c.monto,a.c.moneda)}`;act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 ARquiler.com</a>`;} else if(a.tipo==='pago-atrasado'){tit=`Pago ATRASADO — ${pN}`;sub=`${iN} · Vencía el día ${a.diaPago}`;if(isAdmin())act=`<button class="btn btn-primary btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} else if(a.tipo==='pago-proximo'){tit=`Pago próximo — ${pN}`;sub=`${iN} · Vence el día ${a.diaPago} (en ${a.dias} días)`;if(isAdmin())act=`<button class="btn btn-ghost btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} return `<div class="alert-card ${cls}"><div style="font-size:1.1rem">🔔</div><div class="alert-card-body"><div class="alert-card-title">${tit}</div><div class="alert-card-sub">${sub}</div><div class="alert-card-actions">${act}</div></div></div>`; }).join('')+'</div>'; };
-  el.innerHTML=sec(alertas.filter(a=>a.tipo==='pago-atrasado'),'Pagos Atrasados','🚨','red')+sec(alertas.filter(a=>a.tipo==='contrato-vencido'),'Contratos Vencidos','📛','red')+sec(alertas.filter(a=>a.tipo==='actualizacion'),'Actualizaciones','📊','yellow')+sec(alertas.filter(a=>a.tipo==='pago-proximo'),'Pagos Próximos','⏰','yellow')+sec(alertas.filter(a=>a.tipo==='contrato-vencer'),'Contratos por Vencer','📋','yellow');
+  const sec=(items,title,icon,cls)=>{ if(!items.length) return ''; return `<div class="alerts-section"><div class="alerts-section-title">${icon} ${title} (${items.length})</div>`+items.map(a=>{ const pN=a.p?.direccion||'?'; const iN=a.i?.nombre||'?'; let tit='',sub='',act=''; if(a.tipo==='contrato-vencido'){tit=`Contrato VENCIDO — ${pN}`;sub=`Inquilino: ${iN} · Venció el ${fmtDate(a.c.fecha_vencimiento)}`;} else if(a.tipo==='contrato-vencer'){tit=`Contrato por vencer — ${pN}`;sub=`Inquilino: ${iN} · Vence en ${a.dias} días`;} else if(a.tipo==='actualizacion'){const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};tit=`Actualización ${fl[a.c.actualizacion_meses]||''} — ${pN}`;sub=`${iN} · ${fmtMoney(a.c.monto,a.c.moneda)} · Fecha: ${fmtDate(a.proxFecha)}`;act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 ARquiler.com</a>`;} else if(a.tipo==='actualizacion-proxima'){const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};tit=`⚠️ Actualización el mes próximo — ${pN}`;sub=`${iN} · ${fmtMoney(a.c.monto,a.c.moneda)} · Índice: ${esc(a.c.indice)} · Actualizar en ${a.dias} días`;act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular en ARquiler.com</a>`;} else if(a.tipo==='pago-atrasado'){tit=`Pago ATRASADO — ${pN}`;sub=`${iN} · Vencía el día ${a.diaPago}`;if(isAdmin())act=`<button class="btn btn-primary btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} else if(a.tipo==='pago-proximo'){tit=`Pago próximo — ${pN}`;sub=`${iN} · Vence el día ${a.diaPago} (en ${a.dias} días)`;if(isAdmin())act=`<button class="btn btn-ghost btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} return `<div class="alert-card ${cls}"><div style="font-size:1.1rem">🔔</div><div class="alert-card-body"><div class="alert-card-title">${tit}</div><div class="alert-card-sub">${sub}</div><div class="alert-card-actions">${act}</div></div></div>`; }).join('')+'</div>'; };
+  el.innerHTML=sec(alertas.filter(a=>a.tipo==='pago-atrasado'),'Pagos Atrasados','🚨','red')+sec(alertas.filter(a=>a.tipo==='contrato-vencido'),'Contratos Vencidos','📛','red')+sec(alertas.filter(a=>a.tipo==='actualizacion'),'Actualizaciones Inmediatas','📊','red')+sec(alertas.filter(a=>a.tipo==='actualizacion-proxima'),'Actualizaciones el Mes Próximo','📅','yellow')+sec(alertas.filter(a=>a.tipo==='pago-proximo'),'Pagos Próximos','⏰','yellow')+sec(alertas.filter(a=>a.tipo==='contrato-vencer'),'Contratos por Vencer','📋','yellow');
 }
 
 // ═══════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════
 function renderDashboard(){
-  const alertas=calcAlertas(); const urgentes=alertas.filter(a=>a.urgencia==='red'); updateAlertBadge();
+  const alertas=calcAlertas(); const urgentes=alertas.filter(a=>a.urgencia==='red'); const proximas=alertas.filter(a=>a.tipo==='actualizacion-proxima'); updateAlertBadge();
   const props=cache.propiedades; const conts=cache.contratos; const pags=cache.pagos;
   const alq=props.filter(p=>p.estado==='Alquilado').length;
   const activos=conts.filter(c=>!c.fecha_vencimiento||diasHasta(c.fecha_vencimiento)>=0).length;
@@ -949,7 +951,21 @@ function renderDashboard(){
   const cobrado=pags.filter(p=>p.estado==='Cobrado'&&p.periodo===mes).reduce((s,p)=>s+Number(p.monto||0),0);
   const banner=!isAdmin()?`<div class="owner-header"><h2>Bienvenido, ${currentProfile?.nombre||'Propietario'}</h2><p>Estado de tus propiedades, contratos y pagos.</p></div>`:'';
   document.getElementById('dashContent').innerHTML=`${banner}
-    <div class="stats-grid">
+    ${proximas.length ? `
+  <div style="background:linear-gradient(135deg,rgba(201,169,110,0.15),rgba(145,120,96,0.1));border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:10px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;">
+    <div style="font-size:1.6rem;line-height:1;">📅</div>
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:0.95rem;color:var(--accent);margin-bottom:6px;">Actualizaciones de alquiler el mes próximo</div>
+      ${proximas.map(a=>{
+        const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
+        return `<div style="font-size:0.83rem;color:var(--text);margin-bottom:4px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+          <span>📍 <strong>${esc(a.p?.direccion)||'—'}</strong> · ${esc(a.i?.nombre)||'—'} · ${fmtMoney(a.c.monto,a.c.moneda)} · <em>${esc(a.c.indice)}</em></span>
+          <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>` : ''}
+<div class="stats-grid">
       <div class="stat-card accent"><div class="stat-label">Propiedades</div><div class="stat-val">${props.length}</div><div class="stat-sub">${alq} alquiladas</div></div>
       <div class="stat-card"><div class="stat-label">Contratos activos</div><div class="stat-val">${activos}</div><div class="stat-sub">${conts.length} total</div></div>
       <div class="stat-card ${urgentes.length?'danger':''}"><div class="stat-label">Alertas</div><div class="stat-val">${alertas.length}</div><div class="stat-sub">${urgentes.length} urgentes</div></div>
@@ -1098,8 +1114,8 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#eee;padding:30px 
 .fila:nth-child(odd){background:#fafafa;}
 .fila.principal{font-weight:600;background:#fffbf4;}
 .fila.total{background:#111;color:white;font-weight:700;font-size:0.92rem;border-radius:0 0 4px 4px;}
-.fila.total span:last-child{color:#c9a96e;}
-.nota{background:#fffbf0;border-left:3px solid #c9a96e;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:14px;line-height:1.6;}
+.fila.total span:last-child{color:#917860;}
+.nota{background:#fffbf0;border-left:3px solid #917860;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:14px;line-height:1.6;}
 .pie{background:#f5f5f5;border-top:1px solid #ddd;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;}
 .pie p{font-size:0.7rem;color:#999;}
 @media print{body{background:white;padding:0;}.cupon{box-shadow:none;border:none;width:100%;}.no-print{display:none!important;}}
@@ -1138,7 +1154,7 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#eee;padding:30px 
   </div>
   <div class="pie">
     <p>Generado el ${hoy}${emp.tel?' · '+emp.tel:''}${emp.email?' · '+emp.email:''}</p>
-    <button onclick="window.print()" class="no-print" style="background:#111;color:#c9a96e;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
+    <button onclick="window.print()" class="no-print" style="background:#111;color:#917860;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
   </div>
 </div>
 </body></html>`;
@@ -1340,11 +1356,11 @@ window.generarRecibo = async function(pagoId){
   .concepto-fila:nth-child(odd){background:#fafafa;}
   .concepto-fila.principal{font-weight:600;background:#fffbf4;}
   .concepto-fila.total-fila{background:#1a1916;color:white;font-weight:700;font-size:0.95rem;margin-top:2px;border-bottom:none;}
-  .concepto-fila.total-fila span:last-child{color:#c9a96e;font-size:1.05rem;}
+  .concepto-fila.total-fila span:last-child{color:#917860;font-size:1.05rem;}
   .concepto-header{display:flex;justify-content:space-between;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;padding:7px 12px;border-bottom:1px solid #ddd;background:#f5f5f5;}
   .datos-inquilino{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#f8f8f8;border-radius:4px;padding:12px;margin-bottom:16px;}
   .dato-item{font-size:0.78rem;} .dato-item label{color:#888;display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;} .dato-item span{font-weight:500;color:#1a1916;}
-  .nota{background:#fff8e8;border-left:3px solid #c9a96e;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:16px;line-height:1.6;}
+  .nota{background:#fff8e8;border-left:3px solid #917860;padding:10px 14px;font-size:0.78rem;color:#555;margin-top:16px;line-height:1.6;}
   .pie{border-top:1px solid #e0e0e0;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;background:#f8f8f8;}
   .pie p{font-size:0.7rem;color:#999;}
   .no-print{margin-left:12px;}
@@ -1405,7 +1421,7 @@ window.generarRecibo = async function(pagoId){
 
   <div class="pie">
     <p>Cupón generado el ${hoy} · TerraLex${emp.tel ? ' · ' + emp.tel : ''}${emp.email ? ' · ' + emp.email : ''}</p>
-    <button onclick="window.print()" class="no-print" style="background:#1a1916;color:#c9a96e;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
+    <button onclick="window.print()" class="no-print" style="background:#1a1916;color:#917860;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
   </div>
 </div>
 </body>
