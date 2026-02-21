@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://identitytoolkit.googleapis.com; connect-src https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
 <meta name="referrer" content="no-referrer">
-<title>GestorProp</title>
+<title>TerraLex — Gestión de Propiedades</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0f0e0c;--surface:#1a1916;--surface2:#242220;--border:#2e2c28;--accent:#c9a96e;--accent2:#e8c987;--text:#f0ece4;--muted:#8a8070;--danger:#c96e6e;--success:#6ec98a;--warning:#c9b96e;--info:#6ea0c9;}
@@ -162,8 +162,8 @@ tr:hover td{background:var(--surface2);}
 <div class="login-wrap" id="loginScreen" style="display:none;">
   <div class="login-box">
     <div class="login-logo">
-      <h1>GestorProp</h1>
-      <p>Administración de Propiedades</p>
+      <h1>TerraLex</h1>
+      <p>Gestión de Propiedades</p>
     </div>
     <div class="login-card">
       <h2>Iniciar sesión</h2>
@@ -181,7 +181,7 @@ tr:hover td{background:var(--surface2);}
 <!-- APP -->
 <div class="app" id="app">
   <aside class="sidebar">
-    <div class="logo"><h1>GestorProp</h1><span>Propiedades</span></div>
+    <div class="logo"><h1>TerraLex</h1><span>Gestión de Propiedades</span></div>
     <div class="user-pill">
       <div class="user-avatar" id="userAvatar">?</div>
       <div style="flex:1;overflow:hidden;">
@@ -617,6 +617,9 @@ function setupUI(){
 
   const adminItems = isAdmin() ? `
     <div class="nav-label">Gestión</div>
+    <div class="nav-item" data-page="cupones" onclick="showPage('cupones',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>Cupones
+    </div>
     <div class="nav-item" data-page="propietarios" onclick="showPage('propietarios',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Propietarios
     </div>
@@ -638,9 +641,6 @@ function setupUI(){
     </div>
     <div class="nav-item" data-page="contratos" onclick="showPage('contratos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Contratos
-    </div>
-    <div class="nav-item" data-page="cupones" onclick="showPage('cupones',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>Cupones
     </div>
     <div class="nav-item" data-page="pagos" onclick="showPage('pagos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Pagos
@@ -1108,7 +1108,7 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#eee;padding:30px 
   <div class="invalido">${emp.nota||'Documento no válido como comprobante de pago'}</div>
   <div class="header">
     <div>
-      <div class="emp-nombre">${emp.razon||'GestorProp'}</div>
+      <div class="emp-nombre">${emp.razon||'TerraLex'}</div>
       ${emp.domicilio?`<div class="emp-dato">📍 ${emp.domicilio}</div>`:''}
       ${emp.cuit?`<div class="emp-dato">CUIT: ${emp.cuit}</div>`:''}
       ${emp.iva?`<div class="emp-dato">Cond. IVA: ${emp.iva}</div>`:''}
@@ -1363,7 +1363,7 @@ window.generarRecibo = async function(pagoId){
   <div class="cabecera">
     <div class="cabecera-grid">
       <div>
-        <div class="razon-social">${emp.razon || 'GestorProp'}</div>
+        <div class="razon-social">${emp.razon || 'TerraLex'}</div>
         ${emp.domicilio ? `<div class="cab-dato">📍 ${emp.domicilio}</div>` : ''}
         ${emp.cuit     ? `<div class="cab-dato">CUIT: ${emp.cuit}</div>` : ''}
         ${emp.iva      ? `<div class="cab-dato">Condición IVA: ${emp.iva}</div>` : ''}
@@ -1404,7 +1404,7 @@ window.generarRecibo = async function(pagoId){
   </div>
 
   <div class="pie">
-    <p>Cupón generado el ${hoy} · GestorProp${emp.tel ? ' · ' + emp.tel : ''}${emp.email ? ' · ' + emp.email : ''}</p>
+    <p>Cupón generado el ${hoy} · TerraLex${emp.tel ? ' · ' + emp.tel : ''}${emp.email ? ' · ' + emp.email : ''}</p>
     <button onclick="window.print()" class="no-print" style="background:#1a1916;color:#c9a96e;border:none;padding:9px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.82rem;">🖨️ Imprimir / PDF</button>
   </div>
 </div>
