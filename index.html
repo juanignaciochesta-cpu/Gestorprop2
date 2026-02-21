@@ -952,7 +952,17 @@ function calcAlertas(){
     if(c.fecha_inicio&&c.actualizacion_meses){
       const fi=typeof c.fecha_inicio==='string'?c.fecha_inicio:c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
       const ini=new Date(fi+'T00:00:00'); const mt=(anio-ini.getFullYear())*12+(mes-(ini.getMonth()+1));
-      if(mt>=c.actualizacion_meses){ const ciclos=Math.floor(mt/c.actualizacion_meses); const pma=ini.getMonth()+1+ciclos*c.actualizacion_meses; const pa=ini.getFullYear()+Math.floor((ini.getMonth()+pma-1)/12); const pm=((pma-1)%12)+1; const pf=`${pa}-${String(pm).padStart(2,'0')}-${String(ini.getDate()).padStart(2,'0')}`; const d=diasHasta(pf); if(d>=-15&&d<=30) alertas.push({tipo:'actualizacion',urgencia:d<0?'red':'yellow',dias:d,c,p,i,proxFecha:pf}); else if(d>30&&d<=60) alertas.push({tipo:'actualizacion-proxima',urgencia:'orange',dias:d,c,p,i,proxFecha:pf}); }
+      const actInfo = calcActualizaciones(c);
+      if(actInfo.proximaRaw){
+        const diasProx = actInfo.diasProx;
+        if(diasProx < 0){
+          // Ya venció — alerta ROJA sin importar hace cuánto
+          alertas.push({tipo:'actualizacion-vencida', urgencia:'red', dias:diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
+        } else if(diasProx <= 20){
+          // Faltan 20 días o menos — alerta NARANJA
+          alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
+        }
+      }
     }
     if(c.dia_pago){
       const dp=parseInt(c.dia_pago); const gr=parseInt(c.dias_gracia)||5; const per=`${anio}-${String(mes).padStart(2,'0')}`;
@@ -966,15 +976,25 @@ function updateAlertBadge(){ const n=calcAlertas().length; const b=document.getE
 function renderAlertas(){
   const alertas=calcAlertas(); const el=document.getElementById('alertasContent');
   if(!alertas.length){ el.innerHTML=`<div class="card" style="text-align:center;padding:60px"><div style="font-size:3rem;margin-bottom:14px">✅</div><strong>Todo en orden</strong><p style="color:var(--muted);margin-top:6px">Sin alertas pendientes.</p></div>`; return; }
-  const sec=(items,title,icon,cls)=>{ if(!items.length) return ''; return `<div class="alerts-section"><div class="alerts-section-title">${icon} ${title} (${items.length})</div>`+items.map(a=>{ const pN=a.p?.direccion||'?'; const iN=a.i?.nombre||'?'; let tit='',sub='',act=''; if(a.tipo==='contrato-vencido'){tit=`Contrato VENCIDO — ${pN}`;sub=`Inquilino: ${iN} · Venció el ${fmtDate(a.c.fecha_vencimiento)}`;} else if(a.tipo==='contrato-vencer'){tit=`Contrato por vencer — ${pN}`;sub=`Inquilino: ${iN} · Vence en ${a.dias} días`;} else if(a.tipo==='actualizacion'){const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};tit=`Actualización ${fl[a.c.actualizacion_meses]||''} — ${pN}`;sub=`${iN} · ${fmtMoney(a.c.monto,a.c.moneda)} · Fecha: ${fmtDate(a.proxFecha)}`;act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 ARquiler.com</a>`;} else if(a.tipo==='actualizacion-proxima'){const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};tit=`⚠️ Actualización el mes próximo — ${pN}`;sub=`${iN} · ${fmtMoney(a.c.monto,a.c.moneda)} · Índice: ${esc(a.c.indice)} · Actualizar en ${a.dias} días`;act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular en ARquiler.com</a>`;} else if(a.tipo==='pago-atrasado'){tit=`Pago ATRASADO — ${pN}`;sub=`${iN} · Vencía el día ${a.diaPago}`;if(isAdmin())act=`<button class="btn btn-primary btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} else if(a.tipo==='pago-proximo'){tit=`Pago próximo — ${pN}`;sub=`${iN} · Vence el día ${a.diaPago} (en ${a.dias} días)`;if(isAdmin())act=`<button class="btn btn-ghost btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} return `<div class="alert-card ${cls}"><div style="font-size:1.1rem">🔔</div><div class="alert-card-body"><div class="alert-card-title">${tit}</div><div class="alert-card-sub">${sub}</div><div class="alert-card-actions">${act}</div></div></div>`; }).join('')+'</div>'; };
-  el.innerHTML=sec(alertas.filter(a=>a.tipo==='pago-atrasado'),'Pagos Atrasados','🚨','red')+sec(alertas.filter(a=>a.tipo==='contrato-vencido'),'Contratos Vencidos','📛','red')+sec(alertas.filter(a=>a.tipo==='actualizacion'),'Actualizaciones Inmediatas','📊','red')+sec(alertas.filter(a=>a.tipo==='actualizacion-proxima'),'Actualizaciones el Mes Próximo','📅','yellow')+sec(alertas.filter(a=>a.tipo==='pago-proximo'),'Pagos Próximos','⏰','yellow')+sec(alertas.filter(a=>a.tipo==='contrato-vencer'),'Contratos por Vencer','📋','yellow');
+  const sec=(items,title,icon,cls)=>{ if(!items.length) return ''; return `<div class="alerts-section"><div class="alerts-section-title">${icon} ${title} (${items.length})</div>`+items.map(a=>{ const pN=a.p?.direccion||'?'; const iN=a.i?.nombre||'?'; let tit='',sub='',act=''; if(a.tipo==='contrato-vencido'){tit=`Contrato VENCIDO — ${pN}`;sub=`Inquilino: ${iN} · Venció el ${fmtDate(a.c.fecha_vencimiento)}`;} else if(a.tipo==='contrato-vencer'){tit=`Contrato por vencer — ${pN}`;sub=`Inquilino: ${iN} · Vence en ${a.dias} días`;} else if(a.tipo==='actualizacion-vencida'){
+          const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
+          tit=`🔴 Actualización VENCIDA — ${pN}`;
+          sub=`${iN} · Monto actual: ${fmtMoney(a.c.monto,a.c.moneda)} · Índice: ${esc(a.c.indice)} · Debió actualizarse en: ${a.ultimaLabel} (hace ${Math.abs(a.dias)} días)`;
+          act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular nuevo monto</a>`;
+        } else if(a.tipo==='actualizacion-proxima'){
+          const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
+          tit=`⚠️ Actualización en ${a.dias} días — ${pN}`;
+          sub=`${iN} · Monto actual: ${fmtMoney(a.c.monto,a.c.moneda)} · Índice: ${esc(a.c.indice)} · Actualizar en: ${a.proximaLabel}`;
+          act=`<a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn">🔗 Calcular nuevo monto</a>`;
+        } else if(a.tipo==='pago-atrasado'){tit=`Pago ATRASADO — ${pN}`;sub=`${iN} · Vencía el día ${a.diaPago}`;if(isAdmin())act=`<button class="btn btn-primary btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} else if(a.tipo==='pago-proximo'){tit=`Pago próximo — ${pN}`;sub=`${iN} · Vence el día ${a.diaPago} (en ${a.dias} días)`;if(isAdmin())act=`<button class="btn btn-ghost btn-xs" onclick="openModalPago('${a.c.id}')">Registrar</button>`;} return `<div class="alert-card ${cls}"><div style="font-size:1.1rem">🔔</div><div class="alert-card-body"><div class="alert-card-title">${tit}</div><div class="alert-card-sub">${sub}</div><div class="alert-card-actions">${act}</div></div></div>`; }).join('')+'</div>'; };
+  el.innerHTML=sec(alertas.filter(a=>a.tipo==='pago-atrasado'),'Pagos Atrasados','🚨','red')+sec(alertas.filter(a=>a.tipo==='contrato-vencido'),'Contratos Vencidos','📛','red')+sec(alertas.filter(a=>a.tipo==='actualizacion-vencida'),'Actualizaciones VENCIDAS — Actualizar ya','🔴','red')+sec(alertas.filter(a=>a.tipo==='actualizacion-proxima'),'Actualizaciones Próximas — Menos de 20 días','⚠️','yellow')+sec(alertas.filter(a=>a.tipo==='pago-proximo'),'Pagos Próximos','⏰','yellow')+sec(alertas.filter(a=>a.tipo==='contrato-vencer'),'Contratos por Vencer','📋','yellow');
 }
 
 // ═══════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════
 function renderDashboard(){
-  const alertas=calcAlertas(); const urgentes=alertas.filter(a=>a.urgencia==='red'); const proximas=alertas.filter(a=>a.tipo==='actualizacion-proxima'); updateAlertBadge();
+  const alertas=calcAlertas(); const urgentes=alertas.filter(a=>a.urgencia==='red'); const actVencidas=alertas.filter(a=>a.tipo==='actualizacion-vencida'); const actProximas=alertas.filter(a=>a.tipo==='actualizacion-proxima'); updateAlertBadge();
   const props=cache.propiedades; const conts=cache.contratos; const pags=cache.pagos;
   const alq=props.filter(p=>p.estado==='Alquilado').length;
   const activos=conts.filter(c=>!c.fecha_vencimiento||diasHasta(c.fecha_vencimiento)>=0).length;
@@ -982,18 +1002,28 @@ function renderDashboard(){
   const cobrado=pags.filter(p=>p.estado==='Cobrado'&&p.periodo===mes).reduce((s,p)=>s+Number(p.monto||0),0);
   const banner=!isAdmin()?`<div class="owner-header"><h2>Bienvenido, ${currentProfile?.nombre||'Propietario'}</h2><p>Estado de tus propiedades, contratos y pagos.</p></div>`:'';
   document.getElementById('dashContent').innerHTML=`${banner}
-    ${proximas.length ? `
-  <div style="background:linear-gradient(135deg,rgba(201,169,110,0.15),rgba(145,120,96,0.1));border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:10px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;">
-    <div style="font-size:1.6rem;line-height:1;">📅</div>
+    ${actVencidas.length ? `
+  <div style="background:rgba(201,110,110,0.1);border:1px solid var(--danger);border-left:4px solid var(--danger);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px;">
+    <div style="font-size:1.6rem;line-height:1;">🔴</div>
     <div style="flex:1;">
-      <div style="font-weight:700;font-size:0.95rem;color:var(--accent);margin-bottom:6px;">Actualizaciones de alquiler el mes próximo</div>
-      ${proximas.map(a=>{
-        const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
-        return `<div style="font-size:0.83rem;color:var(--text);margin-bottom:4px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-          <span>📍 <strong>${esc(a.p?.direccion)||'—'}</strong> · ${esc(a.i?.nombre)||'—'} · ${fmtMoney(a.c.monto,a.c.moneda)} · <em>${esc(a.c.indice)}</em></span>
+      <div style="font-weight:700;font-size:0.95rem;color:var(--danger);margin-bottom:8px;">Actualizaciones VENCIDAS — Requieren acción inmediata</div>
+      ${actVencidas.map(a=>`
+        <div style="font-size:0.83rem;color:var(--text);margin-bottom:6px;padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+          <span>📍 <strong>${esc(a.p?.direccion)||'—'}</strong> · ${esc(a.i?.nombre)||'—'} · ${fmtMoney(a.c.monto,a.c.moneda)} · <em>${esc(a.c.indice)}</em> · <span style="color:var(--danger);">Debió actualizarse: ${a.ultimaLabel}</span></span>
           <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>
-        </div>`;
-      }).join('')}
+        </div>`).join('')}
+    </div>
+  </div>` : ''}
+${actProximas.length ? `
+  <div style="background:rgba(201,185,110,0.08);border:1px solid var(--warning);border-left:4px solid var(--warning);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px;">
+    <div style="font-size:1.6rem;line-height:1;">⚠️</div>
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:0.95rem;color:var(--warning);margin-bottom:8px;">Actualizaciones próximas — Menos de 20 días</div>
+      ${actProximas.map(a=>`
+        <div style="font-size:0.83rem;color:var(--text);margin-bottom:6px;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+          <span>📍 <strong>${esc(a.p?.direccion)||'—'}</strong> · ${esc(a.i?.nombre)||'—'} · ${fmtMoney(a.c.monto,a.c.moneda)} · <em>${esc(a.c.indice)}</em> · Actualizar en: <strong>${a.proximaLabel}</strong> (${a.dias} días)</span>
+          <a href="${arquilerLink(a.c)}" target="_blank" class="arquiler-btn" style="margin-left:10px;white-space:nowrap;">🔗 Calcular</a>
+        </div>`).join('')}
     </div>
   </div>` : ''}
 <div class="stats-grid">
