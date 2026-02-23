@@ -958,19 +958,20 @@ function calcAlertas(){
       const fi=typeof c.fecha_inicio==='string'?c.fecha_inicio:c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
       const ini=new Date(fi+'T00:00:00'); const mt=(anio-ini.getFullYear())*12+(mes-(ini.getMonth()+1));
       const actInfo = calcActualizaciones(c);
-      if(actInfo.ultimaRaw){
-        // Verificar si ya se registró la actualización para este ciclo
-        const yaActualizado = cache.actualizaciones.some(a => a.contrato_id === c.id && a.periodo === actInfo.ultima);
-        if(actInfo.diasUltima > 0 && !yaActualizado){
-          // ROJA: fecha pasó y no se registró actualización
+      // Chequeo 1: ¿la última actualización venció y no fue registrada? → ROJA
+      if(actInfo.ultimaRaw && actInfo.diasUltima > 0){
+        const yaActualizadoUltima = cache.actualizaciones.some(a => a.contrato_id === c.id && a.periodo === actInfo.ultima);
+        if(!yaActualizadoUltima){
           alertas.push({tipo:'actualizacion-vencida', urgencia:'red', dias:actInfo.diasUltima, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
-        } else if(!yaActualizado && actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
-          // NARANJA: próxima en menos de 20 días y no se registró
+        }
+      }
+      // Chequeo 2: ¿la próxima actualización está en 20 días o menos? → NARANJA
+      // Independiente del chequeo anterior — puede darse los dos a la vez o solo uno
+      if(actInfo.proximaRaw && actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
+        const yaActualizadoProxima = cache.actualizaciones.some(a => a.contrato_id === c.id && a.periodo === actInfo.proxima);
+        if(!yaActualizadoProxima){
           alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
         }
-      } else if(actInfo.proximaRaw && actInfo.diasProx >= 0 && actInfo.diasProx <= 20){
-        const yaActualizado = cache.actualizaciones.some(a => a.contrato_id === c.id && a.periodo === actInfo.proxima);
-        if(!yaActualizado) alertas.push({tipo:'actualizacion-proxima', urgencia:'orange', dias:actInfo.diasProx, c, p, i, ultimaLabel:actInfo.ultima, proximaLabel:actInfo.proxima});
       }
     }
     if(c.dia_pago){
