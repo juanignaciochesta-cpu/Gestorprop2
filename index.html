@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://identitytoolkit.googleapis.com; connect-src https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://identitytoolkit.googleapis.com; connect-src https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com wss://*.firebaseio.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
 <meta name="referrer" content="no-referrer">
 <title>TerraLex — Gestión de Propiedades</title>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -570,8 +570,20 @@ window.doLogout = async function(){
 window.resetPass = async function(){
   const email = prompt('Ingresá tu email:');
   if(!email) return;
-  await sendPasswordResetEmail(auth, email);
-  showToast('Se envió un email de recuperación','success');
+  try {
+    // Verificar que el email esté registrado en la base de datos
+    const { getDocs: _gd, collection: _col, query: _q, where: _w } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const q = _q(_col(db, 'Users'), _w('email', '==', email.trim().toLowerCase()));
+    const snap = await _gd(q);
+    if(snap.empty){
+      showToast('No existe ninguna cuenta registrada con ese email.', 'error');
+      return;
+    }
+    await sendPasswordResetEmail(auth, email.trim());
+    showToast('Se envió un email de recuperación. Revisá tu bandeja de entrada.', 'success');
+  } catch(e){
+    showToast('Error al procesar la solicitud. Intentá de nuevo.', 'error');
+  }
 };
 
 // ═══════════════════════════════════════
