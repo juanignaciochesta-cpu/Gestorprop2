@@ -341,8 +341,26 @@ tr:hover td{background:var(--surface2);}
       <div class="form-group"><label>Depósito</label><input type="number" id="c-dep"></div>
       <div class="form-group"><label>N° Expediente</label><input id="c-exp"></div>
       <div class="form-group form-full"><label>Notas</label><textarea id="c-notas"></textarea></div>
+      <div class="form-group form-full" style="margin-top:4px;">
+        <label style="font-weight:700;color:var(--accent);font-size:0.8rem;letter-spacing:0.05em;text-transform:uppercase;">Números de cuenta de servicios</label>
+      </div>
+      <div class="form-group"><label>N° Cuenta Agua</label><input id="c-cta-agua" placeholder="Ej: 123456-7"></div>
+      <div class="form-group"><label>N° Cuenta Luz</label><input id="c-cta-luz" placeholder="Ej: 98765-4"></div>
+      <div class="form-group"><label>N° Cuenta Gas</label><input id="c-cta-gas" placeholder="Ej: 456789-0"></div>
+      <div class="form-group"><label>N° Cuenta Municipal</label><input id="c-cta-muni" placeholder="Ej: 001-234567"></div>
+      <div class="form-group"><label>N° Cuenta Rentas Prov.</label><input id="c-cta-rentas" placeholder="Ej: 789-012345"></div>
     </div></div>
     <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modalContrato')">Cancelar</button><button class="btn btn-primary" style="width:auto" onclick="guardarContrato()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalDetallesContrato">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Detalles del Contrato</div>
+      <button class="modal-close" onclick="closeModal('modalDetallesContrato')">✕</button>
+    </div>
+    <div class="modal-body" id="detallesContratoBody" style="padding:0;"></div>
   </div>
 </div>
 
@@ -838,7 +856,7 @@ window.openContratoModal = function(){
   openModal('modalContrato');
 };
 window.guardarContrato = async function(){
-  const o={propiedad_id:document.getElementById('c-prop').value,inquilino_id:document.getElementById('c-inq').value||null,fecha_inicio:document.getElementById('c-ini').value||null,fecha_vencimiento:document.getElementById('c-ven').value||null,monto:document.getElementById('c-monto').value||null,moneda:document.getElementById('c-mon').value,indice:document.getElementById('c-ind').value,actualizacion_meses:parseInt(document.getElementById('c-frec').value),dia_pago:document.getElementById('c-dia').value||null,dias_gracia:document.getElementById('c-grac').value||5,deposito:document.getElementById('c-dep').value||null,expediente:document.getElementById('c-exp').value,notas:document.getElementById('c-notas').value};
+  const o={propiedad_id:document.getElementById('c-prop').value,inquilino_id:document.getElementById('c-inq').value||null,fecha_inicio:document.getElementById('c-ini').value||null,fecha_vencimiento:document.getElementById('c-ven').value||null,monto:document.getElementById('c-monto').value||null,moneda:document.getElementById('c-mon').value,indice:document.getElementById('c-ind').value,actualizacion_meses:parseInt(document.getElementById('c-frec').value),dia_pago:document.getElementById('c-dia').value||null,dias_gracia:document.getElementById('c-grac').value||5,deposito:document.getElementById('c-dep').value||null,expediente:document.getElementById('c-exp').value,notas:document.getElementById('c-notas').value,cuentas:{agua:document.getElementById('c-cta-agua').value||'',luz:document.getElementById('c-cta-luz').value||'',gas:document.getElementById('c-cta-gas').value||'',municipal:document.getElementById('c-cta-muni').value||'',rentas:document.getElementById('c-cta-rentas').value||''}};
   if(!o.propiedad_id){ showToast('Seleccioná una propiedad','error'); return; }
   try {
     if(editMode.id) await updateDoc(doc(db,'contratos',editMode.id),o);
@@ -883,11 +901,12 @@ function renderContratos(filter=''){
   let rows=cache.contratos; if(filter) rows=rows.filter(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
   if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">📄</div><p>No hay contratos</p></div></td></tr>`; return; }
   const fl={3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
-  tbody.innerHTML=rows.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const e=contratoEst(c); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editContrato('${c.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delContrato('${c.id}')">✕</button>`:''; const act=calcActualizaciones(c);
+  tbody.innerHTML=rows.map(c=>{ const p=getProp(c.propiedad_id); const i=getInq(c.inquilino_id); const e=contratoEst(c); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="editContrato('${c.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delContrato('${c.id}')">✕</button>`:'';
+    const btnDetalles=`<button class="btn btn-ghost btn-xs" onclick="verDetallesContrato('${c.id}')">📋 Detalles</button>`; const act=calcActualizaciones(c);
     const proximaBadge = act.proximaRaw ? (act.diasProx<=30&&act.diasProx>=0 ? `<span style="color:var(--warning);font-weight:700;">⚠️ ${act.proxima}</span>` : act.diasProx<0 ? `<span style="color:var(--danger);font-weight:700;">❗ ${act.proxima}</span>` : act.proxima) : act.proxima;
-    return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${fmtDate(c.fecha_inicio)}</td><td>${fmtDate(c.fecha_vencimiento)}</td><td><strong>${fmtMoney(c.monto,c.moneda)}</strong></td><td style="font-size:.76rem">${fl[c.actualizacion_meses]||c.actualizacion_meses+'m'} / ${esc(c.indice)}</td><td style="font-size:.8rem">${esc(act.ultima)}</td><td style="font-size:.8rem">${proximaBadge}</td><td><span class="badge ${e.cls}">${e.l}</span></td><td><div class="actions"><a href="${arquilerLink(c)}" target="_blank" class="arquiler-btn">🔗</a>${acts}</div></td></tr>`; }).join('');
+    return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${fmtDate(c.fecha_inicio)}</td><td>${fmtDate(c.fecha_vencimiento)}</td><td><strong>${fmtMoney(c.monto,c.moneda)}</strong></td><td style="font-size:.76rem">${fl[c.actualizacion_meses]||c.actualizacion_meses+'m'} / ${esc(c.indice)}</td><td style="font-size:.8rem">${esc(act.ultima)}</td><td style="font-size:.8rem">${proximaBadge}</td><td><span class="badge ${e.cls}">${e.l}</span></td><td><div class="actions">${btnDetalles}<a href="${arquilerLink(c)}" target="_blank" class="arquiler-btn">🔗</a>${acts}</div></td></tr>`; }).join('');
 }
-window.editContrato = function(id){ const c=getCont(id); if(!c) return; editMode={type:'contratos',id}; openContratoModal(); setTimeout(()=>{ document.getElementById('c-prop').value=c.propiedad_id||''; document.getElementById('c-inq').value=c.inquilino_id||''; document.getElementById('c-ini').value=c.fecha_inicio||''; document.getElementById('c-ven').value=c.fecha_vencimiento||''; document.getElementById('c-monto').value=c.monto||''; document.getElementById('c-mon').value=c.moneda||'ARS'; document.getElementById('c-ind').value=c.indice||'IPC'; document.getElementById('c-frec').value=c.actualizacion_meses||3; document.getElementById('c-dia').value=c.dia_pago||''; document.getElementById('c-grac').value=c.dias_gracia||5; document.getElementById('c-dep').value=c.deposito||''; document.getElementById('c-exp').value=c.expediente||''; document.getElementById('c-notas').value=c.notas||''; document.getElementById('titleContrato').textContent='Editar Contrato'; },50); };
+window.editContrato = function(id){ const c=getCont(id); if(!c) return; editMode={type:'contratos',id}; openContratoModal(); setTimeout(()=>{ document.getElementById('c-prop').value=c.propiedad_id||''; document.getElementById('c-inq').value=c.inquilino_id||''; document.getElementById('c-ini').value=c.fecha_inicio||''; document.getElementById('c-ven').value=c.fecha_vencimiento||''; document.getElementById('c-monto').value=c.monto||''; document.getElementById('c-mon').value=c.moneda||'ARS'; document.getElementById('c-ind').value=c.indice||'IPC'; document.getElementById('c-frec').value=c.actualizacion_meses||3; document.getElementById('c-dia').value=c.dia_pago||''; document.getElementById('c-grac').value=c.dias_gracia||5; document.getElementById('c-dep').value=c.deposito||''; document.getElementById('c-exp').value=c.expediente||''; document.getElementById('c-notas').value=c.notas||''; const ct=c.cuentas||{}; document.getElementById('c-cta-agua').value=ct.agua||''; document.getElementById('c-cta-luz').value=ct.luz||''; document.getElementById('c-cta-gas').value=ct.gas||''; document.getElementById('c-cta-muni').value=ct.municipal||''; document.getElementById('c-cta-rentas').value=ct.rentas||''; document.getElementById('titleContrato').textContent='Editar Contrato'; },50); };
 window.delContrato = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'contratos',id)); await loadAllData(); renderContratos(); showToast('Eliminado'); };
 
 // ═══════════════════════════════════════
@@ -1322,6 +1341,57 @@ window.marcarActualizacion = async function(contratoId, periodo){
     renderAlertas();
     renderDashboard();
   } catch(e){ showToast(e.message,'error'); }
+};
+
+window.verDetallesContrato = function(id){
+  const c = getCont(id);
+  if(!c) return;
+  const p  = getProp(c.propiedad_id);
+  const i  = getInq(c.inquilino_id);
+  const e  = contratoEst(c);
+  const act = calcActualizaciones(c);
+  const ct  = c.cuentas || {};
+  const fl  = {3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
+  const row = (label, val) => val ? `<tr><td style="color:var(--muted);font-size:0.82rem;padding:8px 12px;width:40%;border-bottom:1px solid var(--border);">${label}</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:0.88rem;">${val}</td></tr>` : '';
+  const section = (title) => `<tr><td colspan="2" style="padding:10px 12px 4px;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);background:var(--surface2);">${title}</td></tr>`;
+  const hayCuentas = ct.agua||ct.luz||ct.gas||ct.municipal||ct.rentas;
+  document.getElementById('detallesContratoBody').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      ${section('🏠 Propiedad e Inquilino')}
+      ${row('Propiedad', esc(p?.direccion))}
+      ${row('Tipo', esc(p?.tipo))}
+      ${row('Inquilino', esc(i?.nombre))}
+      ${row('DNI / CUIT', esc(i?.dni))}
+      ${row('Teléfono', esc(i?.telefono))}
+      ${row('Email', esc(i?.email))}
+      ${section('📄 Datos del Contrato')}
+      ${row('N° Expediente', esc(c.expediente))}
+      ${row('Fecha inicio', fmtDate(c.fecha_inicio))}
+      ${row('Fecha vencimiento', fmtDate(c.fecha_vencimiento))}
+      ${row('Estado', `<span class="badge ${e.cls}">${e.l}</span>`)}
+      ${section('💰 Condiciones Económicas')}
+      ${row('Monto mensual', fmtMoney(c.monto, c.moneda))}
+      ${row('Índice de actualización', esc(c.indice))}
+      ${row('Frecuencia', fl[c.actualizacion_meses]||c.actualizacion_meses+'m')}
+      ${row('Última actualización', act.ultima)}
+      ${row('Próxima actualización', act.proxima)}
+      ${row('Día de pago', c.dia_pago ? 'Día ' + c.dia_pago + ' de cada mes' : '')}
+      ${row('Días de gracia', c.dias_gracia ? c.dias_gracia + ' días' : '')}
+      ${row('Depósito', c.deposito ? fmtMoney(c.deposito, c.moneda) : '')}
+      ${hayCuentas ? section('🔌 Números de Cuenta de Servicios') : ''}
+      ${hayCuentas ? row('Agua', esc(ct.agua)) : ''}
+      ${hayCuentas ? row('Luz / Electricidad', esc(ct.luz)) : ''}
+      ${hayCuentas ? row('Gas', esc(ct.gas)) : ''}
+      ${hayCuentas ? row('Tasa Municipal', esc(ct.municipal)) : ''}
+      ${hayCuentas ? row('Rentas Provincial', esc(ct.rentas)) : ''}
+      ${c.notas ? section('📝 Notas') : ''}
+      ${c.notas ? row('', esc(c.notas)) : ''}
+    </table>
+    <div style="padding:14px 16px;text-align:right;">
+      <a href="${arquilerLink(c)}" target="_blank" class="btn btn-ghost btn-sm">🔗 Ver en ARquiler.com</a>
+      ${isAdmin() ? `<button class="btn btn-ghost btn-sm" onclick="closeModal('modalDetallesContrato');editContrato('${c.id}')">✏️ Editar</button>` : ''}
+    </div>`;
+  openModal('modalDetallesContrato');
 };
 
 window.filterTable = function(type,val){ const f=val.toLowerCase().trim(); ({propiedades:renderPropiedades,inquilinos:renderInquilinos,contratos:renderContratos,pagos:renderPagos})[type]?.(f); };
