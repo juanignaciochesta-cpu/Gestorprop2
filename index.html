@@ -912,8 +912,7 @@ window.delContrato = async function(id){ if(!confirm('¿Eliminar?')) return; awa
 // ═══════════════════════════════════════
 // PAGOS
 // ═══════════════════════════════════════
-window.openModalPago = async function(contratoId){
-  // Recargar contratos frescos antes de abrir el modal
+window.openModalPago = async function(contratoId, periodoPreset=''){
   if(cache.contratos.length === 0){
     try {
       const snap = await getDocs(collection(db,'contratos'));
@@ -926,7 +925,9 @@ window.openModalPago = async function(contratoId){
     return `<option value="${c.id}">${label}</option>`;
   }).join('');
   document.getElementById('pg-cont').innerHTML='<option value="">Seleccionar contrato...</option>'+opts;
-  const hoy=new Date(); document.getElementById('pg-fecha').value=hoy.toISOString().split('T')[0]; document.getElementById('pg-per').value=hoy.toISOString().slice(0,7);
+  const hoy=new Date();
+  document.getElementById('pg-fecha').value=hoy.toISOString().split('T')[0];
+  document.getElementById('pg-per').value=periodoPreset||hoy.toISOString().slice(0,7);
   if(contratoId){ document.getElementById('pg-cont').value=contratoId; autoFillPago(); }
   openModal('modalPago');
 };
@@ -966,12 +967,74 @@ window.guardarPago = async function(){
   } catch(e){ showToast(e.message,'error'); }
 };
 function totalServicios(sv){ if(!sv) return 0; return (sv.agua||0)+(sv.luz||0)+(sv.gas||0)+(sv.municipal||0)+(sv.rentas||0)+(sv.otros||0); }
+function generarPeriodosVirtuales(){
+  // Para cada contrato activo, genera filas virtuales "Pendiente" para todos los
+  // períodos desde fecha_inicio hasta hoy que no tienen pago registrado
+  const hoy = new Date();
+  const periodoActual = hoy.toISOString().slice(0,7);
+  const virtuales = [];
+  const contratos = isAdmin() ? cache.contratos : cache.contratos.filter(c=>{
+    const prop = getProp(c.propiedad_id);
+    return prop && cache.propietarios.some(u=>u.id===currentProfile?.id && prop.propietario_id===u.id);
+  });
+  contratos.forEach(c=>{
+    if(!c.fecha_inicio) return;
+    const fi = typeof c.fecha_inicio==='string' ? c.fecha_inicio : c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
+    const ini = new Date(fi+'T00:00:00');
+    // Iterar mes a mes desde inicio hasta hoy
+    let cur = new Date(ini.getFullYear(), ini.getMonth(), 1);
+    const fin = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    while(cur <= fin){
+      const periodo = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+      const existe = cache.pagos.some(pg => pg.contrato_id===c.id && pg.periodo===periodo);
+      if(!existe){
+        const dp = parseInt(c.dia_pago)||1;
+        const fechaVenc = new Date(cur.getFullYear(), cur.getMonth(), dp);
+        const atrasado = hoy > new Date(fechaVenc.getTime() + (parseInt(c.dias_gracia)||5)*86400000);
+        virtuales.push({
+          __virtual: true,
+          contrato_id: c.id,
+          periodo,
+          monto: c.monto,
+          moneda: c.moneda,
+          estado: atrasado ? 'Atrasado' : 'Pendiente',
+          fecha_pago: null,
+          servicios: null
+        });
+      }
+      cur.setMonth(cur.getMonth()+1);
+    }
+  });
+  return virtuales;
+}
+
 function renderPagos(filter=''){
   const tbody=document.getElementById('tbody-pagos');
-  let rows=cache.pagos; if(filter) rows=rows.filter(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
-  if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💳</div><p>No hay pagos</p></div></td></tr>`; return; }
+  // Combinar pagos reales + virtuales, ordenar por período desc
+  const virtuales = generarPeriodosVirtuales();
+  let todos = [...cache.pagos, ...virtuales];
+  todos.sort((a,b)=> (b.periodo||'').localeCompare(a.periodo||''));
+  if(filter){
+    todos = todos.filter(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; return (p&&p.direccion?.toLowerCase().includes(filter))||(i&&i.nombre?.toLowerCase().includes(filter)); });
+  }
+  if(!todos.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💳</div><p>No hay pagos</p></div></td></tr>`; return; }
   const eb={Cobrado:'badge-green',Pendiente:'badge-yellow',Atrasado:'badge-red'};
-  tbody.innerHTML=rows.map(pg=>{ const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null; const per=pg.periodo?pg.periodo.split('-').reverse().join('/'):'—'; const ts=totalServicios(pg.servicios); const acts=isAdmin()?`<button class="btn btn-ghost btn-xs" onclick="generarRecibo('${pg.id}')">🧾 Recibo</button><button class="btn btn-ghost btn-xs" onclick="editPago('${pg.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPago('${pg.id}')">✕</button>`:`<button class="btn btn-ghost btn-xs" onclick="generarRecibo('${pg.id}')">🧾 Recibo</button>`; return `<tr><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${per}</td><td><strong>${fmtMoney(pg.monto,pg.moneda)}</strong></td><td>${ts>0?fmtMoney(ts,pg.moneda):'—'}</td><td>${fmtDate(pg.fecha_pago)}</td><td><span class="badge ${eb[pg.estado]||'badge-gray'}">${esc(pg.estado)}</span></td><td><div class="actions">${acts}</div></td></tr>`; }).join('');
+  tbody.innerHTML=todos.map(pg=>{
+    const c=getCont(pg.contrato_id); const p=c?getProp(c.propiedad_id):null; const i=c?getInq(c.inquilino_id):null;
+    const per=pg.periodo?pg.periodo.split('-').reverse().join('/'):'—';
+    const ts=totalServicios(pg.servicios);
+    let acts='';
+    if(pg.__virtual){
+      // Pago virtual — solo admin puede registrarlo
+      acts = isAdmin() ? `<button class="btn btn-primary btn-xs" onclick="openModalPago('${pg.contrato_id}','${pg.periodo}')">+ Registrar</button>` : '—';
+    } else {
+      acts = isAdmin()
+        ? `<button class="btn btn-ghost btn-xs" onclick="generarRecibo('${pg.id}')">🧾 Recibo</button><button class="btn btn-ghost btn-xs" onclick="editPago('${pg.id}')">Editar</button><button class="btn btn-danger btn-xs" onclick="delPago('${pg.id}')">✕</button>`
+        : `<button class="btn btn-ghost btn-xs" onclick="generarRecibo('${pg.id}')">🧾 Recibo</button>`;
+    }
+    const rowStyle = pg.__virtual ? 'opacity:0.7;' : '';
+    return `<tr style="${rowStyle}"><td>${esc(p?.direccion)||'—'}</td><td>${esc(i?.nombre)||'—'}</td><td>${per}</td><td><strong>${pg.__virtual?fmtMoney(pg.monto,pg.moneda):fmtMoney(pg.monto,pg.moneda)}</strong></td><td>${ts>0?fmtMoney(ts,pg.moneda):'—'}</td><td>${pg.fecha_pago?fmtDate(pg.fecha_pago):'—'}</td><td><span class="badge ${eb[pg.estado]||'badge-gray'}">${esc(pg.estado)}</span></td><td><div class="actions">${acts}</div></td></tr>`;
+  }).join('');
 }
 window.editPago = function(id){ const pg=cache.pagos.find(x=>x.id===id); if(!pg) return; editMode={type:'pagos',id}; openModalPago(pg.contrato_id); setTimeout(()=>{ document.getElementById('pg-cont').value=pg.contrato_id||''; document.getElementById('pg-per').value=pg.periodo||''; document.getElementById('pg-fecha').value=pg.fecha_pago||''; document.getElementById('pg-monto').value=pg.monto||''; document.getElementById('pg-mon').value=pg.moneda||'ARS'; document.getElementById('pg-met').value=pg.metodo||''; document.getElementById('pg-est').value=pg.estado||'Cobrado'; document.getElementById('pg-notas').value=pg.notas||''; const sv=pg.servicios||{}; document.getElementById('pg-agua').value=sv.agua||''; document.getElementById('pg-luz').value=sv.luz||''; document.getElementById('pg-gas').value=sv.gas||''; document.getElementById('pg-municipal').value=sv.municipal||''; document.getElementById('pg-rentas').value=sv.rentas||''; document.getElementById('pg-otros').value=sv.otros||''; document.getElementById('pg-otros-label').value=sv.otros_label||''; document.getElementById('titlePago').textContent='Editar Pago'; },50); };
 window.delPago = async function(id){ if(!confirm('¿Eliminar?')) return; await deleteDoc(doc(db,'pagos',id)); await loadAllData(); renderPagos(); showToast('Eliminado'); };
@@ -1038,6 +1101,7 @@ function renderDashboard(){
   const alq=props.filter(p=>p.estado==='Alquilado').length;
   const activos=conts.filter(c=>!c.fecha_vencimiento||diasHasta(c.fecha_vencimiento)>=0).length;
   const mes=new Date().toISOString().slice(0,7);
+  // Solo suma el monto de alquiler, NO los servicios
   const cobrado=pags.filter(p=>p.estado==='Cobrado'&&p.periodo===mes).reduce((s,p)=>s+Number(p.monto||0),0);
   const banner=!isAdmin()?`<div class="owner-header"><h2>Bienvenido, ${currentProfile?.nombre||'Propietario'}</h2><p>Estado de tus propiedades, contratos y pagos.</p></div>`:'';
   document.getElementById('dashContent').innerHTML=`${banner}
