@@ -625,9 +625,22 @@ async function loadAllData(){
   cache.propiedades     = propSnap.docs.map(d=>({id:d.id,...d.data()}));
   cache.contratos       = contSnap.docs.map(d=>({id:d.id,...d.data()}));
   cache.pagos           = pagSnap.docs.map(d=>({id:d.id,...d.data()}));
-  cache.inquilinos      = inqSnap ? inqSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
   cache.cupones         = cupSnap ? cupSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
-  // Actualizaciones siempre para todos los roles — carga separada para evitar bug de destructuring
+  // Actualizaciones siempre
+
+  // Inquilinos: admin carga todos, propietario carga solo los de sus contratos
+  if(isAdmin()){
+    cache.inquilinos = inqSnap ? inqSnap.docs.map(d=>({id:d.id,...d.data()})) : [];
+  } else {
+    const misInqIds = [...new Set(cache.contratos.map(c=>c.inquilino_id).filter(Boolean))];
+    if(misInqIds.length > 0){
+      const inqDocs = await Promise.all(misInqIds.map(inqId => getDoc(doc(db,'inquilinos',inqId))));
+      cache.inquilinos = inqDocs.filter(d=>d.exists()).map(d=>({id:d.id,...d.data()}));
+    } else {
+      cache.inquilinos = [];
+    }
+  }
+  // Actualizaciones DUMMY — reemplazado abajo para todos los roles — carga separada para evitar bug de destructuring
   const actSnap = await getDocs(collection(db,'actualizaciones'));
   cache.actualizaciones = actSnap.docs.map(d=>({id:d.id,...d.data()}));
 
