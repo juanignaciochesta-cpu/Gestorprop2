@@ -982,7 +982,8 @@ function generarPeriodosVirtuales(){
     const fi = typeof c.fecha_inicio==='string' ? c.fecha_inicio : c.fecha_inicio?.toDate?.().toISOString().split('T')[0];
     const ini = new Date(fi+'T00:00:00');
     // Iterar mes a mes desde inicio hasta hoy
-    let cur = new Date(ini.getFullYear(), ini.getMonth(), 1);
+    // Solo desde el mes actual en adelante
+    let cur = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const fin = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     while(cur <= fin){
       const periodo = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
